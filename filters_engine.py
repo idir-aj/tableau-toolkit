@@ -192,10 +192,22 @@ def appliquer_modifications_filtres(xml_content: bytes, df_edited: pd.DataFrame,
             else:
                 zone.set("mode", mode_xml)
 
-            if show_apply:
-                zone.set("show-apply", "true")
-            else:
+            if mode_xml == "typeinlist":
+                # saisie texte : valeurs tapées, pas chargées depuis la DB
+                zone.set("values", "typed-value")
+                zone.attrib.pop("show-all", None)
                 zone.attrib.pop("show-apply", None)
+                for zs in zone.findall("zone-style"):
+                    zone.remove(zs)
+            else:
+                zone.set("values", "database")
+                if show_apply:
+                    zone.set("show-apply", "true")
+                else:
+                    zone.attrib.pop("show-apply", None)
+                # restaurer <zone-style> si le filtre venait d'être en typeinlist
+                if zone.find("zone-style") is None:
+                    ET.SubElement(zone, "zone-style")
 
     return serialiser_xml(tree)
 
