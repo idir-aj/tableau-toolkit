@@ -1,0 +1,536 @@
+# translations.py — Chaînes UI en français et en anglais
+TRANSLATIONS = {
+    "fr": {
+        # ── Général ────────────────────────────────────────────────
+        "title":        "🧰 Boîte à outils Tableau",
+        "upload_label": "Uploader le fichier .twb, .twbx ou .tds",
+        "upload_error": "❌ Impossible de lire le fichier : {}",
+        "tds_not_applicable": "Cet outil ne s'applique pas aux fichiers .tds (source de données sans classeur).",
+        "guide_title": "📖 Guide d'utilisation",
+        "app_intro": """
+Boîte à outils pour modifier les classeurs Tableau (`.twb` / `.twbx`) et les sources de données (`.tds`) directement, sans ouvrir Tableau Desktop.
+
+- 📐 **Redimensionner** — Modifiez la résolution des dashboards et repositionnez les objets automatiquement.
+- 🔽 **Formater les filtres** — Modifiez le mode des filtres, ajoutez-en ou réassociez leurs feuilles sources.
+- 🔌 **Changer la connexion** — Remplacez le catalogue, le serveur ou renommez les tables dans les connexions Databricks.
+- 📊 **Performances** — Analysez un enregistrement de performances Tableau et identifiez les goulots d'étranglement.
+""",
+        # ── Onglets ────────────────────────────────────────────────
+        "tab_resize":    "📐 Redimensionner",
+        "tab_filters":   "🔽 Formater les filtres",
+        "tab_connexion": "🔌 Changer la connexion",
+        # ── Outil 1 — Redimensionner ───────────────────────────────
+        "resize_apply_all_title":   "Appliquer à tous les dashboards cochés",
+        "resize_common_width":      "Largeur commune",
+        "resize_common_height":     "Hauteur commune",
+        "resize_btn_apply_all":     "↓ Appliquer à tous",
+        "resize_warn_no_dim":       "Renseigne au moins une dimension commune.",
+        "resize_dashboards_title":  "Dashboards",
+        "resize_dashboards_caption":"Cochez les dashboards à modifier et renseignez les nouvelles dimensions.",
+        "resize_col_check":  "Modifier",
+        "resize_col_dash":   "Dashboard",
+        "resize_col_cur_w":  "Largeur act.",
+        "resize_col_cur_h":  "Hauteur act.",
+        "resize_col_new_w":  "Nouvelle largeur",
+        "resize_col_new_h":  "Nouvelle hauteur",
+        "resize_toggle_right":      "Déplacer vers la droite",
+        "resize_toggle_right_desc": "Repositionne les objets lors d'un agrandissement horizontal",
+        "resize_toggle_down":       "Déplacer vers le bas",
+        "resize_toggle_down_desc":  "Repositionne les objets lors d'un agrandissement vertical",
+        "resize_btn":           "Modifier ({n} dashboard{s} sélectionné{s})",
+        "resize_error_dims":    "Dimensions manquantes pour : **{}**",
+        "resize_success":       "✅ {} dashboard(s) modifié(s).",
+        "resize_download":      "⬇️ Télécharger le fichier modifié",
+        "resize_no_dashboard":  "Aucun dashboard trouvé dans ce fichier.",
+        "resize_suffix":        "_redimensionné",
+        "resize_guide": """
+> 🔒 **Confidentialité** — Cet outil ne lit jamais les données de vos extraits (fichiers `.hyper`). Seule la structure XML du classeur est modifiée. Toutefois, les fichiers uploadés transitent par les serveurs de Streamlit Cloud : si votre `.twbx` contient un extrait avec des données sensibles, **préférez uploader le fichier `.twb`** à la place.
+
+**Étape 1 — Charger le classeur**
+: Uploadez votre fichier **.twb** ou **.twbx** via le bouton en haut de la page.
+
+---
+
+**Étape 2 — Appliquer les mêmes dimensions à tous les dashboards** *(optionnel)*
+: Saisissez une largeur et/ou une hauteur commune, cochez les dashboards concernés, puis cliquez sur **↓ Appliquer à tous**.
+
+*— ou —*
+
+**Étape 3 — Modifier chaque dashboard individuellement**
+: Dans le tableau, cochez les dashboards à redimensionner et saisissez les nouvelles dimensions ligne par ligne.
+
+---
+
+**Étape 4 — Lancer la modification**
+: Cliquez sur le bouton **Modifier** en bas de la page.
+
+**Étape 5 — Télécharger le résultat**
+: Un bouton **Télécharger** apparaît : cliquez dessus pour récupérer le fichier modifié.
+""",
+        # ── Outil 2 — Filtres ──────────────────────────────────────
+        "filtres_no_filter":       "Aucun filtre de dashboard trouvé dans ce fichier.",
+        "filtres_detected":        "{n} filtre{s} détecté{s} dans le fichier.",
+        "filtres_apply_all_title": "Appliquer à tous les filtres cochés",
+        "filtres_common_mode":     "Mode commun",
+        "filtres_common_mode_ph":  "Choisir un mode...",
+        "filtres_apply_btn_col":   "Bouton Appliquer",
+        "filtres_btn_apply_all":   "↓ Appliquer à tous",
+        "filtres_warn_no_mode":    "Sélectionne un mode commun avant d'appliquer.",
+        "filtres_title":   "Filtres",
+        "filtres_caption": (
+            "Cochez les filtres à modifier, choisissez le nouveau mode "
+            "et activez le bouton Appliquer si besoin."
+        ),
+        "filtres_col_check":     "Modifier",
+        "filtres_col_dashboard": "Dashboard",
+        "filtres_col_field":     "Champ",
+        "filtres_col_cur_mode":  "Mode actuel",
+        "filtres_col_new_mode":  "Nouveau mode",
+        "filtres_col_apply_btn": "Bouton Appliquer",
+        "filtres_btn":      "Modifier ({n} filtre{s} sélectionné{s})",
+        "filtres_success":  "✅ {} filtre(s) modifié(s).",
+        "filtres_download": "⬇️ Télécharger le fichier modifié",
+        "filtres_suffix":   "_filtres",
+        # § Ajouter des filtres
+        "filtres_add_title":    "Ajouter des filtres aux dashboards",
+        "filtres_add_caption":  (
+            "Pour chaque dashboard, sélectionnez la feuille source et les champs "
+            "à ajouter comme filtres dans le panneau gauche."
+        ),
+        "filtres_add_no_dashboards": "Aucun dashboard avec des feuilles détecté dans ce fichier.",
+        "filtres_add_sheet_label":   "Feuille source",
+        "filtres_add_fields_label":  "Champs à ajouter comme filtres",
+        "filtres_add_no_fields":     "Aucun champ disponible pour cette feuille.",
+        "filtres_add_btn":     "➕ Ajouter les filtres et télécharger",
+        "filtres_add_success": "✅ {} filtre(s) ajouté(s) au(x) dashboard(s).",
+        "filtres_add_download": "⬇️ Télécharger le fichier modifié",
+        "filtres_add_suffix":   "_filtres_ajoutés",
+        "filtres_add_col_champ": "Champ",
+        "filtres_add_col_mode":  "Mode",
+        "filtres_add_col_apply": "Bouton Appliquer",
+        "filtres_add_col_all":   "Valeur Tout",
+        # § Réassocier la feuille source des filtres
+        "filtres_reassoc_title":           "Changer la feuille source des filtres",
+        "filtres_reassoc_caption":         (
+            "Permet de rattacher des filtres existants à une autre feuille source — utile après "
+            "la suppression ou le renommage d'une feuille, ou pour unifier tous les filtres "
+            "sur une même feuille."
+        ),
+        "filtres_reassoc_apply_all_title": "Appliquer à tous les filtres cochés",
+        "filtres_reassoc_common_sheet":    "Feuille commune",
+        "filtres_reassoc_common_sheet_ph": "Choisir une feuille...",
+        "filtres_reassoc_btn_apply_all":   "↓ Appliquer à tous",
+        "filtres_reassoc_select_all":       "☑ Tout sélectionner",
+        "filtres_reassoc_deselect_all":     "☐ Tout désélectionner",
+        "filtres_reassoc_warn_no_sheet":   "Sélectionne une feuille commune avant d'appliquer.",
+        "filtres_reassoc_table_title":     "Filtres",
+        "filtres_reassoc_table_caption":   "Cochez les filtres à modifier et choisissez la nouvelle feuille source.",
+        "filtres_reassoc_col_check":       "Modifier",
+        "filtres_reassoc_col_dashboard":   "Dashboard",
+        "filtres_reassoc_col_field":       "Champ",
+        "filtres_reassoc_col_display_name": "Nom affiché",
+        "filtres_reassoc_col_cur_sheet":   "Feuille actuelle",
+        "filtres_reassoc_col_new_sheet":   "Nouvelle feuille",
+        "filtres_reassoc_btn":      "Réassocier ({n} filtre{s} sélectionné{s})",
+        "filtres_reassoc_success":  "✅ {} filtre(s) réassocié(s).",
+        "filtres_reassoc_download": "⬇️ Télécharger le fichier modifié",
+        "filtres_reassoc_suffix":   "_feuilles_filtres",
+        "filtres_reassoc_apply_dashboard": "✓ Appliquer à ce dashboard",
+        "filtres_reassoc_warn_no_sheet_dashboard": "Sélectionnez une feuille d'abord",
+        "filtres_guide": """
+> 🔒 **Confidentialité** — Cet outil ne lit jamais les données de vos extraits (fichiers `.hyper`). Seule la structure XML du classeur est modifiée. Toutefois, les fichiers uploadés transitent par les serveurs de Streamlit Cloud : si votre `.twbx` contient un extrait avec des données sensibles, **préférez uploader le fichier `.twb`** à la place.
+
+**Étape 1 — Charger le classeur**
+: Uploadez votre fichier **.twb** ou **.twbx** via le bouton en haut de la page.
+
+---
+
+**Étape 2 — Formater les filtres existants**
+: Dans l'onglet **Formater**, cochez les filtres à modifier et choisissez le nouveau mode d'affichage.
+
+*— ou —*
+
+**Étape 3 — Ajouter de nouveaux filtres**
+: Dans l'onglet **Ajouter**, sélectionnez la feuille source et les champs à ajouter comme filtres pour chaque dashboard.
+
+*— ou —*
+
+**Étape 4 — Réassocier la feuille source des filtres**
+: Dans l'onglet **Réassocier**, rattachez des filtres existants à une autre feuille source.
+
+---
+
+**Étape 5 — Télécharger le résultat**
+: Un bouton **Télécharger** apparaît après chaque opération : cliquez dessus pour récupérer le fichier modifié.
+""",
+        "conn_no_databricks":   "Aucune connexion avec un catalogue Databricks détectée dans ce fichier.",
+        "conn_detected_title":  "Connexions détectées",
+        "conn_lbl_catalog": "Catalogue :",
+        "conn_lbl_server":  "Serveur :",
+        "conn_lbl_schema":  "Schéma :",
+        # § 1 — Serveur
+        "conn_server_title":    "1 — Serveur / chemin HTTP",
+        "conn_env_label":       "Environnement cible",
+        "conn_env_exploration": "Exploration (préprod/dev)",
+        "conn_env_indus":       "Indus (prod)",
+        "conn_env_custom":      "Personnalisé",
+        "conn_server_input":    "Nom d'hôte du serveur",
+        "conn_http_input":      "Chemin HTTP (v-http-path)",
+        # § 2 — Catalogue
+        "conn_catalog_title":   "2 — Remplacer le catalogue",
+        "conn_catalog_source":  "Catalogue à remplacer",
+        "conn_catalog_target":  "Nouveau catalogue cible",
+        "conn_catalog_ph":      "Ex : datalake_insight_analytics",
+        # § 3 — Tables
+        "conn_tables_title":   "3 — Renommer les tables",
+        "conn_tables_caption": (
+            "Cochez les tables à renommer et éditez le nom cible. "
+            "Le champ suffixe permet de pré-remplir automatiquement toutes les lignes correspondantes."
+        ),
+        "conn_no_tables":      "Aucune table détectée dans le fichier.",
+        "conn_suffix_label":   "Pré-remplir depuis un suffixe",
+        "conn_suffix_ph":      "Ex : _idir",
+        "conn_prefill_btn":    "↓ Pré-remplir",
+        "conn_suffix_warn":    "Aucune table ne se termine par « {} ».",
+        "conn_col_check":        "Modifier",
+        "conn_col_type":         "Type",
+        "conn_col_catalog":      "Catalogue",
+        "conn_col_schema":       "Schéma",
+        "conn_col_cur_table":    "Table actuelle",
+        "conn_col_target_table": "Table cible",
+        # Récap & bouton
+        "conn_recap_catalog": "- Catalogue : `{}` → `{}`",
+        "conn_recap_server":  "- Serveur : `{}` → `{}`",
+        "conn_recap_http":    "- Chemin HTTP : `{}` → `{}`",
+        "conn_recap_tables":  "- {n} table{s} renommée{s}",
+        "conn_recap_title":   "**Modifications qui seront appliquées :**\n{}",
+        "conn_apply_btn":     "✅ Appliquer et télécharger",
+        "conn_err_catalog":   "Catalogue : {}",
+        "conn_err_server":    "Serveur : {}",
+        "conn_err_tables":    "Tables : {}",
+        "conn_ok_catalog":    "{n} connexion{s} mise{s} à jour",
+        "conn_ok_server":     "serveur mis à jour",
+        "conn_ok_tables":     "{n} occurrence{s} de tables modifiée{s}",
+        "conn_download":      "⬇️ Télécharger le fichier modifié",
+        "conn_suffix":        "_connexion",
+        "conn_guide": """
+> 🔒 **Confidentialité** — Cet outil ne lit jamais les données de vos extraits (fichiers `.hyper`). Seule la structure XML du classeur ou de la source est modifiée. Toutefois, les fichiers uploadés transitent par les serveurs de Streamlit Cloud : si votre `.twbx` contient un extrait avec des données sensibles, **préférez uploader le fichier `.twb`** ou **.tds** à la place.
+
+**Étape 1 — Charger le classeur ou la source de données**
+: Uploadez votre fichier **.twb**, **.twbx** ou **.tds** via le bouton en haut de la page.
+
+---
+
+**Étape 2 — Modifier le serveur / chemin HTTP** *(optionnel)*
+: Sélectionnez l'environnement cible ou saisissez un nom d'hôte personnalisé.
+
+**Étape 3 — Remplacer le catalogue** *(optionnel)*
+: Indiquez le catalogue source à remplacer et le nouveau catalogue cible.
+
+**Étape 4 — Renommer les tables** *(optionnel)*
+: Cochez les tables à renommer et éditez le nom cible. Utilisez le champ suffixe pour pré-remplir automatiquement.
+
+---
+
+**Étape 5 — Appliquer et télécharger**
+: Cliquez sur **✅ Appliquer et télécharger** pour récupérer le fichier modifié.
+""",
+        # ── Outil 4 — Performances ────────────────────────────────
+        "tab_perf":              "📊 Performances",
+        "upload_required":       "⬆️ Uploadez un fichier .twb, .twbx ou .tds pour utiliser cet outil.",
+        "perf_title":            "Analyser un enregistrement de performances",
+        "perf_caption":          "Uploadez le fichier .twbx généré lors d'un enregistrement de performances Tableau.",
+        "perf_upload_label":     "Fichier .twbx d'enregistrement de performances",
+        "perf_parse_error":      "❌ Impossible de lire le fichier : {}",
+        "perf_no_data":          "Aucune donnée de performance trouvée dans ce fichier.",
+        "perf_kpi_total_time":   "Temps de travail",
+        "perf_kpi_events":       "Événement le + lent",
+        "perf_kpi_queries":      "Requêtes SQL",
+        "perf_kpi_cache_miss":   "Cache miss",
+        "perf_kpi_query_time":   "Temps requêtes",
+        "perf_top_slow_title":   "Top 15 — Événements les plus lents",
+        "perf_top_slow_caption": "Tous types d'événements confondus, triés par durée décroissante.",
+        "perf_by_sheet_title":   "Par feuille",
+        "perf_by_type_title":    "Par catégorie",
+        "perf_by_type_caption":  "Catégories Tableau Performance, triées par temps total décroissant.",
+        "perf_cache_miss_title":   "Requêtes SQL sans cache",
+        "perf_cache_miss_caption": "Requêtes exécutées sans résultat en cache (les plus lentes en premier).",
+        "perf_cache_miss_none":    "✅ Toutes les requêtes SQL ont bénéficié du cache.",
+        "perf_cache_miss_na":      "ℹ️ Données CacheHit non disponibles (enregistrement Tableau Desktop — activé uniquement sur Tableau Server).",
+        "perf_no_sheets":          "Aucune feuille identifiée dans les données.",
+        "perf_waves_title":        "Vagues d'exécution",
+        "perf_waves_caption":      "Détection des pauses > 0,2 s entre groupes d'événements. Chaque vague est un cycle de travail distinct de Tableau.",
+        "perf_llm_title":          "🤖 Analyse IA (Gemini)",
+        "perf_llm_caption":        "Génère une interprétation textuelle des résultats de performance via Google Gemini.",
+        "perf_llm_btn":            "✨ Analyser avec Gemini",
+        "perf_llm_spinner":        "Gemini analyse les données...",
+        "perf_llm_no_key":         "⚠️ Clé API Gemini non configurée. Ajoutez `GEMINI_API_KEY` dans les Secrets Streamlit Cloud.",
+        "perf_llm_error":          "Erreur lors de l'appel à l'API Gemini",
+    },
+    "en": {
+        # ── General ────────────────────────────────────────────────
+        "title":        "🧰 Tableau Toolkit",
+        "upload_label": "Upload the .twb, .twbx or .tds file",
+        "upload_error": "❌ Unable to read the file: {}",
+        "tds_not_applicable": "This tool does not apply to .tds files (data source without workbook).",
+        "guide_title": "📖 How to use",
+        "app_intro": """
+Toolkit to modify Tableau workbooks (`.twb` / `.twbx`) and data sources (`.tds`) directly, without opening Tableau Desktop.
+
+- 📐 **Resize** — Change your dashboard resolutions and automatically reposition objects.
+- 🔽 **Format Filters** — Change filter display modes, add filters, or reassign their source sheets.
+- 🔌 **Change Connection** — Replace the catalog, server, or rename tables in Databricks connections.
+- 📊 **Performance** — Analyze a Tableau performance recording and identify bottlenecks.
+""",
+        # ── Tabs ───────────────────────────────────────────────────
+        "tab_resize":    "📐 Resize",
+        "tab_filters":   "🔽 Format Filters",
+        "tab_connexion": "🔌 Change Connection",
+        # ── Tool 1 — Resize ────────────────────────────────────────
+        "resize_apply_all_title":   "Apply to all checked dashboards",
+        "resize_common_width":      "Common width",
+        "resize_common_height":     "Common height",
+        "resize_btn_apply_all":     "↓ Apply to all",
+        "resize_warn_no_dim":       "Enter at least one common dimension.",
+        "resize_dashboards_title":  "Dashboards",
+        "resize_dashboards_caption":"Check the dashboards to modify and enter the new dimensions.",
+        "resize_col_check": "Modify",
+        "resize_col_dash":  "Dashboard",
+        "resize_col_cur_w": "Current width",
+        "resize_col_cur_h": "Current height",
+        "resize_col_new_w": "New width",
+        "resize_col_new_h": "New height",
+        "resize_toggle_right":      "Move to the right",
+        "resize_toggle_right_desc": "Repositions objects when expanding horizontally",
+        "resize_toggle_down":       "Move downward",
+        "resize_toggle_down_desc":  "Repositions objects when expanding vertically",
+        "resize_btn":          "Modify ({n} dashboard{s} selected)",
+        "resize_error_dims":   "Missing dimensions for: **{}**",
+        "resize_success":      "✅ {} dashboard(s) modified.",
+        "resize_download":     "⬇️ Download modified file",
+        "resize_no_dashboard": "No dashboard found in this file.",
+        "resize_suffix":       "_resized",
+        "resize_guide": """
+> 🔒 **Privacy** — This tool never reads the data from your extracts (`.hyper` files). Only the XML structure of the workbook is modified. However, uploaded files transit through Streamlit Cloud's servers: if your `.twbx` contains an extract with sensitive data, **prefer uploading the `.twb` file** instead.
+
+**Step 1 — Load the workbook**
+: Upload your **.twb** or **.twbx** file using the button at the top of the page.
+
+---
+
+**Step 2 — Apply the same dimensions to all dashboards** *(optional)*
+: Enter a common width and/or height, check the dashboards to affect, then click **↓ Apply to all**.
+
+*— or —*
+
+**Step 3 — Modify each dashboard individually**
+: In the table, check the dashboards to resize and enter their new dimensions row by row.
+
+---
+
+**Step 4 — Run the modification**
+: Click the **Modify** button at the bottom of the page.
+
+**Step 5 — Download the result**
+: A **Download** button will appear: click it to retrieve the modified file.
+""",
+        # ── Tool 2 — Filters ───────────────────────────────────────
+        "filtres_no_filter":       "No dashboard filter found in this file.",
+        "filtres_detected":        "{n} filter{s} detected in the file.",
+        "filtres_apply_all_title": "Apply to all checked filters",
+        "filtres_common_mode":     "Common mode",
+        "filtres_common_mode_ph":  "Choose a mode...",
+        "filtres_apply_btn_col":   "Apply button",
+        "filtres_btn_apply_all":   "↓ Apply to all",
+        "filtres_warn_no_mode":    "Select a common mode before applying.",
+        "filtres_title":   "Filters",
+        "filtres_caption": (
+            "Check the filters to modify, choose the new mode "
+            "and enable the Apply button if needed."
+        ),
+        "filtres_col_check":     "Modify",
+        "filtres_col_dashboard": "Dashboard",
+        "filtres_col_field":     "Field",
+        "filtres_col_cur_mode":  "Current mode",
+        "filtres_col_new_mode":  "New mode",
+        "filtres_col_apply_btn": "Apply button",
+        "filtres_btn":      "Modify ({n} filter{s} selected)",
+        "filtres_success":  "✅ {} filter(s) modified.",
+        "filtres_download": "⬇️ Download modified file",
+        "filtres_suffix":   "_filters",
+        # § Add filters
+        "filtres_add_title":    "Add Filters to Dashboards",
+        "filtres_add_caption":  (
+            "For each dashboard, select the source sheet and the fields "
+            "to add as filters in the left panel."
+        ),
+        "filtres_add_no_dashboards": "No dashboard with sheets detected in this file.",
+        "filtres_add_sheet_label":   "Source sheet",
+        "filtres_add_fields_label":  "Fields to add as filters",
+        "filtres_add_no_fields":     "No fields available for this sheet.",
+        "filtres_add_btn":     "➕ Add filters and download",
+        "filtres_add_success": "✅ {} filter(s) added to dashboard(s).",
+        "filtres_add_download": "⬇️ Download modified file",
+        "filtres_add_suffix":   "_filters_added",
+        "filtres_add_col_champ": "Field",
+        "filtres_add_col_mode":  "Mode",
+        "filtres_add_col_apply": "Apply Button",
+        "filtres_add_col_all":   "Show All",
+        # § Reassign filter source sheet
+        "filtres_reassoc_title":           "Change Filter Source Sheet",
+        "filtres_reassoc_caption":         (
+            "Reassign existing filters to a different source sheet — useful after deleting "
+            "or renaming a sheet, or to consolidate all filters onto a single sheet."
+        ),
+        "filtres_reassoc_apply_all_title": "Apply to all checked filters",
+        "filtres_reassoc_common_sheet":    "Common sheet",
+        "filtres_reassoc_common_sheet_ph": "Choose a sheet...",
+        "filtres_reassoc_btn_apply_all":   "↓ Apply to all",
+        "filtres_reassoc_select_all":       "☑ Select all",
+        "filtres_reassoc_deselect_all":     "☐ Deselect all",
+        "filtres_reassoc_warn_no_sheet":   "Select a common sheet before applying.",
+        "filtres_reassoc_table_title":     "Filters",
+        "filtres_reassoc_table_caption":   "Check the filters to modify and choose the new source sheet.",
+        "filtres_reassoc_col_check":       "Modify",
+        "filtres_reassoc_col_dashboard":   "Dashboard",
+        "filtres_reassoc_col_field":       "Field",
+        "filtres_reassoc_col_display_name": "Display name",
+        "filtres_reassoc_col_cur_sheet":   "Current sheet",
+        "filtres_reassoc_col_new_sheet":   "New sheet",
+        "filtres_reassoc_btn":      "Reassign ({n} filter{s} selected)",
+        "filtres_reassoc_success":  "✅ {} filter(s) reassigned.",
+        "filtres_reassoc_download": "⬇️ Download modified file",
+        "filtres_reassoc_suffix":   "_filter_sheets",
+        "filtres_reassoc_apply_dashboard": "✓ Apply to this dashboard",
+        "filtres_reassoc_warn_no_sheet_dashboard": "Select a sheet first",
+        "filtres_guide": """
+> 🔒 **Privacy** — This tool never reads the data from your extracts (`.hyper` files). Only the XML structure of the workbook is modified. However, uploaded files transit through Streamlit Cloud's servers: if your `.twbx` contains an extract with sensitive data, **prefer uploading the `.twb` file** instead.
+
+**Step 1 — Load the workbook**
+: Upload your **.twb** or **.twbx** file using the button at the top of the page.
+
+---
+
+**Step 2 — Format existing filters**
+: In the **Format** tab, check the filters to modify and choose the new display mode.
+
+*— or —*
+
+**Step 3 — Add new filters**
+: In the **Add** tab, select the source sheet and fields to add as filters for each dashboard.
+
+*— or —*
+
+**Step 4 — Reassign filter source sheets**
+: In the **Reassign** tab, attach existing filters to a different source sheet.
+
+---
+
+**Step 5 — Download the result**
+: A **Download** button will appear after each operation: click it to retrieve the modified file.
+""",
+        "conn_no_databricks":   "No connection with a Databricks catalog detected in this file.",
+        "conn_detected_title":  "Detected connections",
+        "conn_lbl_catalog": "Catalog:",
+        "conn_lbl_server":  "Server:",
+        "conn_lbl_schema":  "Schema:",
+        # § 1 — Server
+        "conn_server_title":    "1 — Server / HTTP path",
+        "conn_env_label":       "Target environment",
+        "conn_env_exploration": "Exploration (preprod/dev)",
+        "conn_env_indus":       "Indus (prod)",
+        "conn_env_custom":      "Custom",
+        "conn_server_input":    "Server hostname",
+        "conn_http_input":      "HTTP path (v-http-path)",
+        # § 2 — Catalog
+        "conn_catalog_title":   "2 — Replace catalog",
+        "conn_catalog_source":  "Catalog to replace",
+        "conn_catalog_target":  "New target catalog",
+        "conn_catalog_ph":      "Ex: datalake_insight_analytics",
+        # § 3 — Tables
+        "conn_tables_title":   "3 — Rename tables",
+        "conn_tables_caption": (
+            "Check the tables to rename and edit the target name. "
+            "The suffix field allows automatic pre-filling of all matching rows."
+        ),
+        "conn_no_tables":      "No table detected in this file.",
+        "conn_suffix_label":   "Pre-fill from a suffix",
+        "conn_suffix_ph":      "Ex: _dev",
+        "conn_prefill_btn":    "↓ Pre-fill",
+        "conn_suffix_warn":    "No table ends with « {} ».",
+        "conn_col_check":        "Modify",
+        "conn_col_type":         "Type",
+        "conn_col_catalog":      "Catalog",
+        "conn_col_schema":       "Schema",
+        "conn_col_cur_table":    "Current table",
+        "conn_col_target_table": "Target table",
+        # Recap & button
+        "conn_recap_catalog": "- Catalog: `{}` → `{}`",
+        "conn_recap_server":  "- Server: `{}` → `{}`",
+        "conn_recap_http":    "- HTTP path: `{}` → `{}`",
+        "conn_recap_tables":  "- {n} table{s} renamed",
+        "conn_recap_title":   "**Changes to be applied:**\n{}",
+        "conn_apply_btn":     "✅ Apply and download",
+        "conn_err_catalog":   "Catalog: {}",
+        "conn_err_server":    "Server: {}",
+        "conn_err_tables":    "Tables: {}",
+        "conn_ok_catalog":    "{n} connection{s} updated",
+        "conn_ok_server":     "server updated",
+        "conn_ok_tables":     "{n} table occurrence{s} modified",
+        "conn_download":      "⬇️ Download modified file",
+        "conn_suffix":        "_connection",
+        "conn_guide": """
+> 🔒 **Privacy** — This tool never reads the data from your extracts (`.hyper` files). Only the XML structure of the workbook or data source is modified. However, uploaded files transit through Streamlit Cloud's servers: if your `.twbx` contains an extract with sensitive data, **prefer uploading the `.twb`** or **.tds** file instead.
+
+**Step 1 — Load the workbook or data source**
+: Upload your **.twb**, **.twbx** or **.tds** file using the button at the top of the page.
+
+---
+
+**Step 2 — Change the server / HTTP path** *(optional)*
+: Select the target environment or enter a custom hostname.
+
+**Step 3 — Replace the catalog** *(optional)*
+: Enter the source catalog to replace and the new target catalog.
+
+**Step 4 — Rename tables** *(optional)*
+: Check the tables to rename and edit the target name. Use the suffix field for automatic pre-filling.
+
+---
+
+**Step 5 — Apply and download**
+: Click **✅ Apply and download** to retrieve the modified file.
+""",
+        # ── Tool 4 — Performance ──────────────────────────────────
+        "tab_perf":              "📊 Performance",
+        "upload_required":       "⬆️ Upload a .twb, .twbx or .tds file to use this tool.",
+        "perf_title":            "Analyze a Performance Recording",
+        "perf_caption":          "Upload the .twbx file generated during a Tableau performance recording.",
+        "perf_upload_label":     "Performance recording .twbx file",
+        "perf_parse_error":      "❌ Unable to read the file: {}",
+        "perf_no_data":          "No performance data found in this file.",
+        "perf_kpi_total_time":   "Work time",
+        "perf_kpi_events":       "Slowest event",
+        "perf_kpi_queries":      "SQL queries",
+        "perf_kpi_cache_miss":   "Cache miss",
+        "perf_kpi_query_time":   "Query time",
+        "perf_top_slow_title":   "Top 15 — Slowest events",
+        "perf_top_slow_caption": "All event types combined, sorted by descending duration.",
+        "perf_by_sheet_title":   "By sheet",
+        "perf_by_type_title":    "By category",
+        "perf_by_type_caption":  "Tableau Performance categories, sorted by total time descending.",
+        "perf_cache_miss_title":   "SQL queries with no cache",
+        "perf_cache_miss_caption": "Queries executed without a cached result (slowest first).",
+        "perf_cache_miss_none":    "✅ All SQL queries benefited from the cache.",
+        "perf_cache_miss_na":      "ℹ️ CacheHit data not available (Tableau Desktop recording — only populated on Tableau Server).",
+        "perf_no_sheets":          "No sheet identified in the data.",
+        "perf_waves_title":        "Execution waves",
+        "perf_waves_caption":      "Pauses > 0.2 s detected between event groups. Each wave is a distinct Tableau work cycle.",
+        "perf_llm_title":          "🤖 AI Analysis (Gemini)",
+        "perf_llm_caption":        "Generates a textual interpretation of the performance results using Google Gemini.",
+        "perf_llm_btn":            "✨ Analyze with Gemini",
+        "perf_llm_spinner":        "Gemini is analyzing the data...",
+        "perf_llm_no_key":         "⚠️ Gemini API key not configured. Add `GEMINI_API_KEY` to your Streamlit Cloud Secrets.",
+        "perf_llm_error":          "Error calling the Gemini API",
+    },
+}

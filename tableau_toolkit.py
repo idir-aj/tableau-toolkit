@@ -1,0 +1,992 @@
+import streamlit as st
+import streamlit_antd_components as sac
+import pandas as pd
+
+from utils import charger_contenu_xml, parser_xml, serialiser_xml, remballer_twbx
+from resize_engine import recuperer_dashboards_avec_tailles, modifier_tableaux_de_bord, init_df_resize
+from filters_engine import (
+    MODES_LABELS, MODES_REVERSE, recuperer_filtres, init_df_filtres, appliquer_modifications_filtres,
+    recuperer_feuilles_par_dashboard, recuperer_champs_feuille, ajouter_filtres_dashboards,
+    recuperer_toutes_feuilles, init_df_reassociation, reassocier_feuille_filtres,
+    appliquer_feuille_commune_par_dashboard,
+)
+from connection_engine import (
+    recuperer_catalogues, remplacer_catalogue,
+    recuperer_tables_sql, init_df_tables, remplacer_tables,
+    remplacer_serveur,
+)
+from performance_engine import (
+    extraire_perf_gantt, filtrer_significatifs, calculer_kpis,
+    top_evenements_lents, resume_par_feuille, resume_par_categorie,
+    requetes_sans_cache, detecter_vagues,
+    construire_prompt_llm, analyser_avec_gemini,
+)
+from translations import TRANSLATIONS
+
+
+# ═══════════════════════════════════════════════════════════════
+# UI PRINCIPALE
+# ═══════════════════════════════════════════════════════════════
+
+def main():
+    # ── Sélecteur de langue ────────────────────────────────────────
+    _col_title, _col_lang = st.columns([5, 1])
+    with _col_lang:
+        st.write("")
+        _choice = st.radio(
+            "",
+            options=["🇫🇷 FR", "🇬🇧 EN"],
+            horizontal=True,
+            key="lang_radio",
+            label_visibility="collapsed",
+        )
+    lang = "en" if "EN" in _choice else "fr"
+    T = TRANSLATIONS[lang]
+
+    with _col_title:
+        st.title(T["title"])
+
+    st.markdown(T["app_intro"])
+
+    # Upload unique partagé entre les onglets 1–3
+    xml_file = st.file_uploader(T["upload_label"], type=["twb", "twbx", "tds"])
+    _is_tds = xml_file is not None and xml_file.name.endswith(".tds")
+
+    st.divider()
+    tab_resize, tab_filtres, tab_connexion, tab_perf = st.tabs(
+        [T["tab_resize"], T["tab_filters"], T["tab_connexion"], T["tab_perf"]]
+    )
+
+
+    # ════════════════════════════════════════════════════
+    # ONGLET 4 — PERFORMANCES
+    # ════════════════════════════════════════════════════
+    with tab_perf:
+        st.subheader(T["perf_title"])
+        st.caption(T["perf_caption"])
+
+        perf_file = st.file_uploader(
+            T["perf_upload_label"],
+            type=["twbx"],
+            key="perf_upload",
+        )
+
+        if perf_file is not None:
+            if st.session_state.get("perf_fichier_actuel") != perf_file.name:
+                st.session_state.pop("perf_df", None)
+                st.session_state.pop("perf_llm_result", None)
+                st.session_state["perf_fichier_actuel"] = perf_file.name
+
+            if "perf_df" not in st.session_state:
+                try:
+                    df_raw = extraire_perf_gantt(perf_file.read())
+                    st.session_state["perf_df"] = filtrer_significatifs(df_raw)
+                except ValueError as e:
+                    st.error(T["perf_parse_error"].format(e))
+
+            if "perf_df" in st.session_state:
+                df_perf = st.session_state["perf_df"]
+
+                if df_perf.empty:
+                    st.warning(T["perf_no_data"])
+                else:
+                    kpis_data = calculer_kpis(df_perf)
+                    col1, col2, col3, col4, col5 = st.columns(5)
+                    col1.metric(T["perf_kpi_total_time"],  f"{kpis_data['temps_total']:.2f} s")
+                    col2.metric(T["perf_kpi_events"],      f"{kpis_data['max_event']:.2f} s")
+                    col3.metric(T["perf_kpi_queries"],     f"{kpis_data['nb_requetes']:,}")
+                    cache_miss_val = f"{kpis_data['nb_cache_miss']:,}" if kpis_data.get("cache_dispo") else "N/A"
+                    col4.metric(T["perf_kpi_cache_miss"],  cache_miss_val)
+                    col5.metric(T["perf_kpi_query_time"],  f"{kpis_data['temps_requetes']:.2f} s")
+
+                    st.divider()
+
+                    st.subheader(T["perf_top_slow_title"])
+                    st.caption(T["perf_top_slow_caption"])
+                    st.dataframe(
+                        top_evenements_lents(df_perf),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+                    df_vagues = detecter_vagues(df_perf)
+                    if not df_vagues.empty and len(df_vagues) > 1:
+                        st.divider()
+                        st.subheader(T["perf_waves_title"])
+                        st.caption(T["perf_waves_caption"])
+                        st.dataframe(df_vagues, use_container_width=True, hide_index=True)
+
+                    st.divider()
+
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.subheader(T["perf_by_sheet_title"])
+                        df_sheet = resume_par_feuille(df_perf)
+                        if not df_sheet.empty:
+                            st.dataframe(df_sheet, use_container_width=True, hide_index=True)
+                        else:
+                            st.info(T["perf_no_sheets"])
+                    with col_b:
+                        st.subheader(T["perf_by_type_title"])
+                        st.caption(T["perf_by_type_caption"])
+                        st.dataframe(
+                            resume_par_categorie(df_perf),
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
+                    st.divider()
+
+                    st.subheader(T["perf_cache_miss_title"])
+                    st.caption(T["perf_cache_miss_caption"])
+                    if not kpis_data.get("cache_dispo"):
+                        st.info(T["perf_cache_miss_na"])
+                    else:
+                        df_miss = requetes_sans_cache(df_perf)
+                        if df_miss.empty:
+                            st.success(T["perf_cache_miss_none"])
+                        else:
+                            st.dataframe(df_miss, use_container_width=True, hide_index=True)
+
+                    # ── Analyse IA (Gemini) ───────────────────────────────
+                    st.divider()
+                    st.subheader(T["perf_llm_title"])
+                    st.caption(T["perf_llm_caption"])
+                    _gemini_key = st.secrets.get("GEMINI_API_KEY", None)
+                    if not _gemini_key:
+                        st.warning(T["perf_llm_no_key"])
+                    else:
+                        if st.button(T["perf_llm_btn"], key="gemini_analyse_btn"):
+                            with st.spinner(T["perf_llm_spinner"]):
+                                try:
+                                    _prompt = construire_prompt_llm(df_perf, kpis_data, lang)
+                                    _model  = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
+                                    st.session_state["perf_llm_result"] = analyser_avec_gemini(
+                                        _prompt, _gemini_key, _model
+                                    )
+                                except Exception as _e:
+                                    st.session_state["perf_llm_result"] = (
+                                        f"⚠️ {T['perf_llm_error']} : {_e}"
+                                    )
+                        if "perf_llm_result" in st.session_state:
+                            st.markdown(st.session_state["perf_llm_result"])
+
+
+    # Outils 1–3 : nécessitent un fichier classeur valide
+    if xml_file is None:
+        with tab_resize:
+            with st.expander(T["guide_title"], expanded=True):
+                st.markdown(T["resize_guide"])
+        with tab_filtres:
+            with st.expander(T["guide_title"], expanded=True):
+                st.markdown(T["filtres_guide"])
+        with tab_connexion:
+            with st.expander(T["guide_title"], expanded=True):
+                st.markdown(T["conn_guide"])
+        return
+
+    try:
+        xml_content, format_entree, ressources = charger_contenu_xml(xml_file)
+        parser_xml(xml_content)  # validation
+    except ValueError as e:
+        st.error(T["upload_error"].format(e))
+        return
+
+    # Réinitialiser si le fichier change
+    if st.session_state.get("fichier_actuel") != xml_file.name:
+        for key in ["df_resize", "df_filtres", "filtres_source", "feuilles_par_dashboard",
+                    "catalogues", "tables_sql", "df_tables",
+                    "df_reassociation", "toutes_feuilles"]:
+            st.session_state.pop(key, None)
+        st.session_state["fichier_actuel"] = xml_file.name
+        st.session_state["format_entree"] = format_entree
+        st.session_state["ressources_twbx"] = ressources
+
+
+    # ════════════════════════════════════════════════════
+    # ONGLET 1 — REDIMENSIONNER
+    # ════════════════════════════════════════════════════
+    with tab_resize:
+        with st.expander(T["guide_title"]):
+            st.markdown(T["resize_guide"])
+        if _is_tds:
+            st.info(T["tds_not_applicable"])
+        else:
+            dashboards = recuperer_dashboards_avec_tailles(xml_content)
+            if not dashboards:
+                st.warning(T["resize_no_dashboard"])
+            else:
+                if "df_resize" not in st.session_state:
+                    st.session_state["df_resize"] = init_df_resize(dashboards)
+
+                # Appliquer à tous
+                st.subheader(T["resize_apply_all_title"])
+                col_a, col_b, col_c = st.columns([1, 1, 1])
+                with col_a:
+                    largeur_globale = st.number_input(
+                        T["resize_common_width"], min_value=1, max_value=3000, value=None,
+                        step=1, placeholder="Ex : 1600", key="resize_global_w"
+                    )
+                with col_b:
+                    hauteur_globale = st.number_input(
+                        T["resize_common_height"], min_value=1, max_value=6000, value=None,
+                        step=1, placeholder="Ex : 1050", key="resize_global_h"
+                    )
+                with col_c:
+                    st.write("")
+                    st.write("")
+                    if st.button(T["resize_btn_apply_all"], use_container_width=True, key="resize_apply_all"):
+                        if largeur_globale is None and hauteur_globale is None:
+                            st.warning(T["resize_warn_no_dim"])
+                        else:
+                            df = st.session_state["df_resize"].copy()
+                            mask = df["Modifier"] == True
+                            if not mask.any():
+                                mask = pd.Series([True] * len(df), index=df.index)
+                            if largeur_globale is not None:
+                                df.loc[mask, "Nouvelle largeur"] = float(largeur_globale)
+                            if hauteur_globale is not None:
+                                df.loc[mask, "Nouvelle hauteur"] = float(hauteur_globale)
+                            st.session_state["df_resize"] = df
+                            st.rerun()
+
+                # Tableau
+                st.subheader(T["resize_dashboards_title"])
+                st.caption(T["resize_dashboards_caption"])
+                edited_resize = st.data_editor(
+                    st.session_state["df_resize"],
+                    column_config={
+                        "Modifier":         st.column_config.CheckboxColumn(T["resize_col_check"], width="small"),
+                        "Dashboard":        st.column_config.TextColumn(T["resize_col_dash"], disabled=True),
+                        "Largeur actuelle": st.column_config.TextColumn(T["resize_col_cur_w"], disabled=True, width="small"),
+                        "Hauteur actuelle": st.column_config.TextColumn(T["resize_col_cur_h"], disabled=True, width="small"),
+                        "Nouvelle largeur": st.column_config.NumberColumn(T["resize_col_new_w"], min_value=1, max_value=3000, step=1),
+                        "Nouvelle hauteur": st.column_config.NumberColumn(T["resize_col_new_h"], min_value=1, max_value=6000, step=1),
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    key="editor_resize",
+                )
+
+                # Toggles
+                st.divider()
+                col_l, col_r = st.columns(2)
+                with col_l:
+                    deplacer_droite = sac.switch(
+                        label=T["resize_toggle_right"],
+                        description=T["resize_toggle_right_desc"],
+                        value=False, align="start", size="xs", position="left", key="toggle_droite"
+                    )
+                with col_r:
+                    deplacer_bas = sac.switch(
+                        label=T["resize_toggle_down"],
+                        description=T["resize_toggle_down_desc"],
+                        value=False, align="start", size="xs", position="left", key="toggle_bas"
+                    )
+
+                nb_coches_resize = int(edited_resize["Modifier"].sum())
+                s = "s" if nb_coches_resize > 1 else ""
+                st.write("")
+                if st.button(
+                    T["resize_btn"].format(n=nb_coches_resize, s=s),
+                    type="primary",
+                    disabled=nb_coches_resize == 0,
+                    key="btn_resize",
+                ):
+                    selection = edited_resize[edited_resize["Modifier"]]
+                    lignes_ko = selection[
+                        selection["Nouvelle largeur"].isna() | selection["Nouvelle hauteur"].isna()
+                    ]
+                    if not lignes_ko.empty:
+                        st.error(T["resize_error_dims"].format(", ".join(lignes_ko["Dashboard"].tolist())))
+                    else:
+                        modifications = {
+                            row["Dashboard"]: (int(row["Nouvelle largeur"]), int(row["Nouvelle hauteur"]))
+                            for _, row in selection.iterrows()
+                        }
+                        try:
+                            fichier = modifier_tableaux_de_bord(xml_content, modifications, deplacer_droite, deplacer_bas)
+                            st.success(T["resize_success"].format(nb_coches_resize))
+                            
+                            nom_base = xml_file.name.replace(".twbx", "").replace(".twb", "")
+                            
+                            # Déterminer le format de sortie et préparer le fichier
+                            if st.session_state.get("format_entree") == "twbx" and st.session_state.get("ressources_twbx"):
+                                fichier_telecharge = remballer_twbx(fichier, st.session_state["ressources_twbx"])
+                                ext = ".twbx"
+                                mime = "application/zip"
+                            else:
+                                fichier_telecharge = fichier
+                                ext = ".twb"
+                                mime = "application/xml"
+                            
+                            st.download_button(
+                                label=T["resize_download"],
+                                data=fichier_telecharge,
+                                file_name=f"{nom_base}{T['resize_suffix']}{ext}",
+                                mime=mime,
+                                key="dl_resize",
+                            )
+                        except ValueError as e:
+                            st.error(str(e))
+
+
+    # ════════════════════════════════════════════════════
+    # ONGLET 2 — FORMATER LES FILTRES
+    # ════════════════════════════════════════════════════
+    with tab_filtres:
+        with st.expander(T["guide_title"]):
+            st.markdown(T["filtres_guide"])
+        if _is_tds:
+            st.info(T["tds_not_applicable"])
+        else:
+            if "filtres_source" not in st.session_state:
+                filtres = recuperer_filtres(xml_content)
+                st.session_state["filtres_source"]          = filtres
+                st.session_state["df_filtres"]              = init_df_filtres(filtres)
+                st.session_state["feuilles_par_dashboard"]  = recuperer_feuilles_par_dashboard(xml_content)
+                st.session_state["toutes_feuilles"]         = recuperer_toutes_feuilles(xml_content)
+                st.session_state["df_reassociation"]        = init_df_reassociation(filtres)
+
+            filtres_source = st.session_state["filtres_source"]
+
+            if not filtres_source:
+                st.warning(T["filtres_no_filter"])
+            else:
+                nb_filtres = len(filtres_source)
+                s = "s" if nb_filtres > 1 else ""
+                st.caption(T["filtres_detected"].format(n=nb_filtres, s=s))
+
+                # Appliquer à tous
+                st.subheader(T["filtres_apply_all_title"])
+                col_a, col_b, col_c = st.columns([2, 1, 1])
+                with col_a:
+                    mode_global = st.selectbox(
+                        T["filtres_common_mode"],
+                        options=MODES_LABELS,
+                        index=None,
+                        placeholder=T["filtres_common_mode_ph"],
+                        key="filtres_global_mode",
+                    )
+                with col_b:
+                    st.write("")
+                    apply_global = st.checkbox(T["filtres_apply_btn_col"], value=True, key="filtres_global_apply")
+                with col_c:
+                    st.write("")
+                    st.write("")
+                    if st.button(T["filtres_btn_apply_all"], use_container_width=True, key="filtres_apply_all"):
+                        if mode_global is None:
+                            st.warning(T["filtres_warn_no_mode"])
+                        else:
+                            df = st.session_state["df_filtres"].copy()
+                            mask = df["Modifier"] == True
+                            if not mask.any():
+                                mask = pd.Series([True] * len(df), index=df.index)
+                            df.loc[mask, "Nouveau mode"]      = mode_global
+                            df.loc[mask, "Bouton Appliquer"]  = apply_global
+                            st.session_state["df_filtres"] = df
+                            st.rerun()
+
+                # Tableau
+                st.subheader(T["filtres_title"])
+                st.caption(T["filtres_caption"])
+
+                edited_filtres = st.data_editor(
+                    st.session_state["df_filtres"],
+                    column_config={
+                        "Modifier":         st.column_config.CheckboxColumn(T["filtres_col_check"], width="small"),
+                        "Dashboard":        st.column_config.TextColumn(T["filtres_col_dashboard"], disabled=True, width="medium"),
+                        "Champ":            st.column_config.TextColumn(T["filtres_col_field"], disabled=True, width="medium"),
+                        "Mode actuel":      st.column_config.TextColumn(T["filtres_col_cur_mode"], disabled=True, width="large"),
+                        "Nouveau mode":     st.column_config.SelectboxColumn(
+                            T["filtres_col_new_mode"],
+                            options=MODES_LABELS,
+                            width="large",
+                        ),
+                        "Bouton Appliquer": st.column_config.CheckboxColumn(T["filtres_col_apply_btn"], width="small"),
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    key="editor_filtres",
+                )
+
+                nb_coches_filtres = int(edited_filtres["Modifier"].sum())
+                s = "s" if nb_coches_filtres > 1 else ""
+                st.write("")
+                if st.button(
+                    T["filtres_btn"].format(n=nb_coches_filtres, s=s),
+                    type="primary",
+                    disabled=nb_coches_filtres == 0,
+                    key="btn_filtres",
+                ):
+                    try:
+                        fichier = appliquer_modifications_filtres(xml_content, edited_filtres, filtres_source)
+                        st.success(T["filtres_success"].format(nb_coches_filtres))
+                        
+                        nom_base = xml_file.name.replace(".twbx", "").replace(".twb", "")
+                        
+                        # Déterminer le format de sortie et préparer le fichier
+                        if st.session_state.get("format_entree") == "twbx" and st.session_state.get("ressources_twbx"):
+                            fichier_telecharge = remballer_twbx(fichier, st.session_state["ressources_twbx"])
+                            ext = ".twbx"
+                            mime = "application/zip"
+                        else:
+                            fichier_telecharge = fichier
+                            ext = ".twb"
+                            mime = "application/xml"
+                        
+                        st.download_button(
+                            label=T["filtres_download"],
+                            data=fichier_telecharge,
+                            file_name=f"{nom_base}{T['filtres_suffix']}{ext}",
+                            mime=mime,
+                            key="dl_filtres",
+                        )
+                    except ValueError as e:
+                        st.error(str(e))
+
+            # ── Ajouter des filtres aux dashboards ──────────────────
+            st.divider()
+            st.subheader(T["filtres_add_title"])
+            st.caption(T["filtres_add_caption"])
+
+            feuilles_par_dash = st.session_state.get("feuilles_par_dashboard", {})
+            if not feuilles_par_dash:
+                st.info(T["filtres_add_no_dashboards"])
+            else:
+                add_specs = []
+                for dash_name, sheets in feuilles_par_dash.items():
+                    with st.expander(dash_name):
+                        sheet_key  = f"add_filter_sheet_{dash_name}"
+                        fields_key = f"add_filter_fields_{dash_name}"
+
+                        selected_sheet = st.selectbox(
+                            T["filtres_add_sheet_label"],
+                            options=sheets,
+                            key=sheet_key,
+                        )
+
+                        champs_dispo = recuperer_champs_feuille(xml_content, selected_sheet)
+                        if not champs_dispo:
+                            st.info(T["filtres_add_no_fields"])
+                        else:
+                            # Dédoublonnage par instance_name, label = caption ou nom déduit
+                            seen_inst: set = set()
+                            labels:    list = []
+                            instances: list = []
+                            for fi in champs_dispo:
+                                inst = fi['instance_name']
+                                if inst in seen_inst:
+                                    continue
+                                seen_inst.add(inst)
+                                labels.append(fi['display_name'])
+                                instances.append(inst)
+
+                            selected_labels = st.multiselect(
+                                T["filtres_add_fields_label"],
+                                options=labels,
+                                key=fields_key,
+                            )
+                            selected_instances = [
+                                instances[labels.index(lbl)]
+                                for lbl in selected_labels
+                            ]
+                            if selected_instances:
+                                # Table de configuration par champ
+                                fi_by_inst = {fi['instance_name']: fi for fi in champs_dispo}
+                                cfg_rows = []
+                                for inst in selected_instances:
+                                    fi   = fi_by_inst.get(inst, {})
+                                    nom  = labels[instances.index(inst)]
+                                    is_q = fi.get('type', 'nominal') == 'quantitative'
+                                    cfg_rows.append({
+                                        "_inst": inst,
+                                        T["filtres_add_col_champ"]: nom,
+                                        T["filtres_add_col_mode"]:  MODES_LABELS[1] if is_q else MODES_LABELS[3],
+                                        T["filtres_add_col_apply"]: not is_q,
+                                        T["filtres_add_col_all"]:   True,
+                                    })
+
+                                cfg_key = f"add_cfg_{dash_name}_{hash(tuple(selected_instances))}"
+                                edited_cfg = st.data_editor(
+                                    pd.DataFrame(cfg_rows),
+                                    key=cfg_key,
+                                    column_config={
+                                        "_inst": None,
+                                        T["filtres_add_col_champ"]: st.column_config.TextColumn(disabled=True),
+                                        T["filtres_add_col_mode"]:  st.column_config.SelectboxColumn(
+                                            options=MODES_LABELS, required=True,
+                                        ),
+                                        T["filtres_add_col_apply"]: st.column_config.CheckboxColumn(),
+                                        T["filtres_add_col_all"]:   st.column_config.CheckboxColumn(),
+                                    },
+                                    hide_index=True,
+                                    use_container_width=True,
+                                )
+
+                                champs_cfg = [
+                                    {
+                                        "instance_name": row["_inst"],
+                                        "mode_xml":      MODES_REVERSE.get(row[T["filtres_add_col_mode"]], ""),
+                                        "show_apply":    bool(row[T["filtres_add_col_apply"]]),
+                                        "show_all":      bool(row[T["filtres_add_col_all"]]),
+                                    }
+                                    for _, row in edited_cfg.iterrows()
+                                ]
+                                add_specs.append({
+                                    "dashboard": dash_name,
+                                    "feuille":   selected_sheet,
+                                    "champs":    champs_cfg,
+                                })
+
+                st.write("")
+                if st.button(
+                    T["filtres_add_btn"],
+                    type="primary",
+                    disabled=not add_specs,
+                    key="btn_add_filters",
+                ):
+                    try:
+                        fichier_add, nb_add = ajouter_filtres_dashboards(xml_content, add_specs)
+                        st.success(T["filtres_add_success"].format(nb_add))
+                        
+                        nom_base = xml_file.name.replace(".twbx", "").replace(".twb", "").replace(".tds", "")
+                        
+                        # Déterminer le format de sortie et préparer le fichier
+                        if _is_tds:
+                            nom_ext = ".tds"
+                            mime = "application/xml"
+                            fichier_telecharge = fichier_add
+                        elif st.session_state.get("format_entree") == "twbx" and st.session_state.get("ressources_twbx"):
+                            nom_ext = ".twbx"
+                            mime = "application/zip"
+                            fichier_telecharge = remballer_twbx(fichier_add, st.session_state["ressources_twbx"])
+                        else:
+                            nom_ext = ".twb"
+                            mime = "application/xml"
+                            fichier_telecharge = fichier_add
+                        
+                        st.download_button(
+                            label=T["filtres_add_download"],
+                            data=fichier_telecharge,
+                            file_name=f"{nom_base}{T['filtres_add_suffix']}{nom_ext}",
+                            mime=mime,
+                            key="dl_add_filters",
+                        )
+                    except ValueError as e:
+                        st.error(str(e))
+
+            # ── Changer la feuille source des filtres ───────────────
+            st.divider()
+            st.subheader(T["filtres_reassoc_title"])
+            st.caption(T["filtres_reassoc_caption"])
+
+            toutes_feuilles = st.session_state.get("toutes_feuilles", [])
+
+            if not filtres_source:
+                st.info(T["filtres_no_filter"])
+            else:
+                # Appliquer à tous
+                st.subheader(T["filtres_reassoc_apply_all_title"])
+                col_ra, col_rb = st.columns([2, 1])
+                with col_ra:
+                    feuille_globale = st.selectbox(
+                        T["filtres_reassoc_common_sheet"],
+                        options=toutes_feuilles,
+                        index=None,
+                        placeholder=T["filtres_reassoc_common_sheet_ph"],
+                        key="reassoc_global_sheet",
+                    )
+                with col_rb:
+                    st.write("")
+                    st.write("")
+                    if st.button(T["filtres_reassoc_btn_apply_all"], use_container_width=True, key="reassoc_apply_all"):
+                        if feuille_globale is None:
+                            st.warning(T["filtres_reassoc_warn_no_sheet"])
+                        else:
+                            df_r = st.session_state["df_reassociation"].copy()
+                            mask_r = df_r["Modifier"] == True
+                            if not mask_r.any():
+                                mask_r = pd.Series([True] * len(df_r), index=df_r.index)
+                            df_r.loc[mask_r, "Nouvelle feuille"] = feuille_globale
+                            st.session_state["df_reassociation"] = df_r
+                            st.rerun()
+
+                # Tableaux par dashboard
+                st.caption(T["filtres_reassoc_table_caption"])
+                df_full_r = st.session_state["df_reassociation"]
+                dashboards_r = df_full_r["Dashboard"].unique().tolist()
+
+                edited_parts: dict = {}
+                for dash_name_r in dashboards_r:
+                    mask_r = df_full_r["Dashboard"] == dash_name_r
+                    sub_df_r = df_full_r[mask_r]
+                    with st.expander(f"📊 {dash_name_r}"):
+                        # Boutons d'action pour ce dashboard
+                        col_d1, col_d2, col_d3 = st.columns([2, 1, 1])
+                        with col_d1:
+                            feuille_dash = st.selectbox(
+                                T["filtres_reassoc_common_sheet"],
+                                options=toutes_feuilles,
+                                index=None,
+                                placeholder=T["filtres_reassoc_common_sheet_ph"],
+                                key=f"reassoc_dash_sheet_{dash_name_r}",
+                            )
+                        with col_d2:
+                            st.write("")
+                            if st.button(T["filtres_reassoc_select_all"], key=f"reassoc_sel_all_{dash_name_r}", use_container_width=True):
+                                df_r = st.session_state["df_reassociation"].copy()
+                                df_r.loc[mask_r, "Modifier"] = True
+                                st.session_state["df_reassociation"] = df_r
+                                st.rerun()
+                        with col_d3:
+                            st.write("")
+                            if st.button(
+                                T.get("filtres_reassoc_apply_dashboard", "✓ Appliquer"),
+                                key=f"reassoc_apply_dash_{dash_name_r}",
+                                use_container_width=True,
+                                type="secondary",
+                            ):
+                                if feuille_dash:
+                                    df_r = st.session_state["df_reassociation"].copy()
+                                    df_r = appliquer_feuille_commune_par_dashboard(df_r, dash_name_r, feuille_dash)
+                                    st.session_state["df_reassociation"] = df_r
+                                    st.rerun()
+                                else:
+                                    st.warning(T.get("filtres_reassoc_warn_no_sheet_dashboard", "Sélectionnez une feuille d'abord"))
+                        
+                        st.write("")
+                        edited_sub_r = st.data_editor(
+                            sub_df_r,
+                            column_config={
+                                "Modifier":         st.column_config.CheckboxColumn(T["filtres_reassoc_col_check"], width="small"),
+                                "Dashboard":        None,
+                                "Champ":            st.column_config.TextColumn(T["filtres_reassoc_col_field"], disabled=True, width="medium"),
+                                "Nom affiché":      st.column_config.TextColumn(T.get("filtres_reassoc_col_display_name", "Nom affiché"), disabled=True, width="medium"),
+                                "Feuille actuelle": st.column_config.TextColumn(T["filtres_reassoc_col_cur_sheet"], disabled=True, width="medium"),
+                                "Nouvelle feuille": st.column_config.SelectboxColumn(
+                                    T["filtres_reassoc_col_new_sheet"],
+                                    options=toutes_feuilles,
+                                    width="medium",
+                                ),
+                            },
+                            hide_index=True,
+                            use_container_width=True,
+                            key=f"editor_reassoc_{dash_name_r}",
+                        )
+                        edited_parts[dash_name_r] = edited_sub_r
+
+                # Recombine les sous-tableaux dans le df complet
+                edited_reassoc = df_full_r.copy()
+                for _sub in edited_parts.values():
+                    edited_reassoc.update(_sub)
+
+                nb_coches_reassoc = int(edited_reassoc["Modifier"].sum())
+                s = "s" if nb_coches_reassoc > 1 else ""
+                st.write("")
+                if st.button(
+                    T["filtres_reassoc_btn"].format(n=nb_coches_reassoc, s=s),
+                    type="primary",
+                    disabled=nb_coches_reassoc == 0,
+                    key="btn_reassoc",
+                ):
+                    try:
+                        fichier_reassoc = reassocier_feuille_filtres(xml_content, edited_reassoc, filtres_source)
+                        # Mettre à jour feuille actuelle dans session_state
+                        updated_source = [dict(f) for f in filtres_source]
+                        for i, row in edited_reassoc[edited_reassoc["Modifier"]].iterrows():
+                            nouvelle = str(row["Nouvelle feuille"]).strip()
+                            if nouvelle:
+                                updated_source[i]["feuille"] = nouvelle
+                        st.session_state["filtres_source"]    = updated_source
+                        st.session_state["df_reassociation"] = init_df_reassociation(updated_source)
+                        st.success(T["filtres_reassoc_success"].format(nb_coches_reassoc))
+                        
+                        nom_base = xml_file.name.replace(".twbx", "").replace(".twb", "")
+                        
+                        # Déterminer le format de sortie et préparer le fichier
+                        if st.session_state.get("format_entree") == "twbx" and st.session_state.get("ressources_twbx"):
+                            fichier_telecharge = remballer_twbx(fichier_reassoc, st.session_state["ressources_twbx"])
+                            ext = ".twbx"
+                            mime = "application/zip"
+                        else:
+                            fichier_telecharge = fichier_reassoc
+                            ext = ".twb"
+                            mime = "application/xml"
+                        
+                        st.download_button(
+                            label=T["filtres_reassoc_download"],
+                            data=fichier_telecharge,
+                            file_name=f"{nom_base}{T['filtres_reassoc_suffix']}{ext}",
+                            mime=mime,
+                            key="dl_reassoc",
+                        )
+                    except ValueError as e:
+                        st.error(str(e))
+
+
+    # ════════════════════════════════════════════════════
+    # ONGLET 3 — CHANGER LA CONNEXION
+    # ════════════════════════════════════════════════════
+    with tab_connexion:
+        with st.expander(T["guide_title"]):
+            st.markdown(T["conn_guide"])
+
+        if "catalogues" not in st.session_state:
+            st.session_state["catalogues"] = recuperer_catalogues(xml_content)
+            st.session_state["tables_sql"] = recuperer_tables_sql(xml_content)
+            st.session_state["df_tables"]  = init_df_tables(st.session_state["tables_sql"])
+
+        # Nettoyage des lignes Extract éventuellement présentes dans un état
+        # de session mis en cache par une ancienne version du code
+        if "df_tables" in st.session_state:
+            _df_chk = st.session_state["df_tables"]
+            if "Schéma" in _df_chk.columns and _df_chk["Schéma"].str.lower().eq("extract").any():
+                st.session_state["tables_sql"] = recuperer_tables_sql(xml_content)
+                st.session_state["df_tables"]  = init_df_tables(st.session_state["tables_sql"])
+
+        catalogues = st.session_state["catalogues"]
+
+        if not catalogues:
+            st.warning(T["conn_no_databricks"])
+        else:
+            conn_ref = catalogues[0]
+
+            # ── Connexions détectées ────────────────────────────
+            st.subheader(T["conn_detected_title"])
+            for c in catalogues:
+                st.markdown(
+                    f"- **{T['conn_lbl_catalog']}** `{c['catalog']}`"
+                    + (f"  |  **{T['conn_lbl_server']}** `{c['server']}`" if c['server'] else "")
+                    + (f"  |  **{T['conn_lbl_schema']}** `{c['schema']}`" if c['schema'] else "")
+                )
+
+            # ── 1 — Serveur / chemin HTTP ───────────────────────
+            st.divider()
+            st.subheader(T["conn_server_title"])
+
+            _ENV_KEYS = ["exploration", "indus", "custom"]
+            _ENV_LABELS = {
+                "exploration": T["conn_env_exploration"],
+                "indus":       T["conn_env_indus"],
+                "custom":      T["conn_env_custom"],
+            }
+            _ENV_DATA = {
+                "exploration": {
+                    "server":    "decathlon-dataplatform-exploration.cloud.databricks.com",
+                    "http_path": "/sql/1.0/warehouses/e71fadc53501a3f1",
+                },
+                "indus": {
+                    "server":    "decathlon-dataplatform-indus.cloud.databricks.com",
+                    "http_path": "/sql/1.0/warehouses/a978e5a19876d1b6",
+                },
+                "custom": None,
+            }
+
+            preset = st.radio(
+                T["conn_env_label"],
+                options=_ENV_KEYS,
+                format_func=lambda k: _ENV_LABELS[k],
+                horizontal=True,
+                key="conn_env_preset",
+            )
+
+            # Quand le preset change, on écrase les valeurs dans session_state
+            # avant que les text_input soient rendus.
+            if _ENV_DATA[preset] is not None:
+                _default_srv  = _ENV_DATA[preset]["server"]
+                _default_http = _ENV_DATA[preset]["http_path"]
+            else:
+                _default_srv  = conn_ref["server"]
+                _default_http = conn_ref["http_path"]
+
+            prev_preset_key = "conn_env_preset_prev"
+            if st.session_state.get(prev_preset_key) != preset:
+                st.session_state["conn_server_cible"] = _default_srv
+                st.session_state["conn_http_cible"]   = _default_http
+                st.session_state[prev_preset_key]     = preset
+
+            col_srv, col_http = st.columns(2)
+            with col_srv:
+                serveur_cible = st.text_input(
+                    T["conn_server_input"],
+                    key="conn_server_cible",
+                )
+            with col_http:
+                http_path_cible = st.text_input(
+                    T["conn_http_input"],
+                    key="conn_http_cible",
+                )
+
+            # ── 2 — Catalogue ──────────────────────────────────
+            st.divider()
+            st.subheader(T["conn_catalog_title"])
+
+            catalogues_uniques = [c["catalog"] for c in catalogues]
+            catalogue_source = st.selectbox(
+                T["conn_catalog_source"],
+                options=catalogues_uniques,
+                key="conn_source",
+            )
+            catalogue_cible = st.text_input(
+                T["conn_catalog_target"],
+                placeholder=T["conn_catalog_ph"],
+                key="conn_cible",
+            )
+
+            # ── 3 — Tables ─────────────────────────────────────
+            st.divider()
+            st.subheader(T["conn_tables_title"])
+            st.caption(T["conn_tables_caption"])
+
+            tables_sql = st.session_state.get("tables_sql", [])
+            if not tables_sql:
+                st.info(T["conn_no_tables"])
+            else:
+                col_suf, col_btn = st.columns([2, 1])
+                with col_suf:
+                    suffixe = st.text_input(
+                        T["conn_suffix_label"],
+                        placeholder=T["conn_suffix_ph"],
+                        key="conn_suffixe",
+                    )
+                with col_btn:
+                    st.write("")
+                    st.write("")
+                    if st.button(T["conn_prefill_btn"], use_container_width=True, key="btn_prefill",
+                                 disabled=not (suffixe and suffixe.strip())):
+                        suf = suffixe.strip()
+                        df = st.session_state["df_tables"].copy()
+                        mask = df["Table actuelle"].str.endswith(suf)
+                        if not mask.any():
+                            st.warning(T["conn_suffix_warn"].format(suf))
+                        else:
+                            df.loc[mask, "Table cible"] = df.loc[mask, "Table actuelle"].str[:-len(suf)]
+                            df.loc[mask, "Modifier"] = True
+                            st.session_state["df_tables"] = df
+                            st.rerun()
+
+                edited_tables = st.data_editor(
+                    st.session_state["df_tables"],
+                    column_config={
+                        "Modifier":       st.column_config.CheckboxColumn(T["conn_col_check"], width="small"),
+                        "Type":           st.column_config.TextColumn(T["conn_col_type"], disabled=True, width="small"),
+                        "Catalogue":      st.column_config.TextColumn(T["conn_col_catalog"], disabled=True),
+                        "Schéma":         st.column_config.TextColumn(T["conn_col_schema"], disabled=True),
+                        "Table actuelle": st.column_config.TextColumn(T["conn_col_cur_table"], disabled=True),
+                        "Table cible":    st.column_config.TextColumn(T["conn_col_target_table"]),
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    key="editor_tables",
+                )
+
+            # ── Appliquer tout ─────────────────────────────────
+            st.divider()
+            nb_coches_tables = int(edited_tables["Modifier"].sum()) if tables_sql else 0
+            catalogue_change = bool(catalogue_cible and catalogue_cible.strip() and catalogue_cible.strip() != catalogue_source)
+            serveur_change   = serveur_cible.strip() != conn_ref["server"]
+            http_change      = http_path_cible.strip() != conn_ref["http_path"]
+
+            recap = []
+            if catalogue_change:
+                recap.append(T["conn_recap_catalog"].format(catalogue_source, catalogue_cible.strip()))
+            if serveur_change:
+                recap.append(T["conn_recap_server"].format(conn_ref['server'], serveur_cible.strip()))
+            if http_change:
+                recap.append(T["conn_recap_http"].format(conn_ref['http_path'], http_path_cible.strip()))
+            if nb_coches_tables:
+                s = "s" if nb_coches_tables > 1 else ""
+                recap.append(T["conn_recap_tables"].format(n=nb_coches_tables, s=s))
+            if recap:
+                st.caption(T["conn_recap_title"].format("\n".join(recap)))
+
+            if st.button(
+                T["conn_apply_btn"],
+                type="primary",
+                disabled=not catalogue_change and not serveur_change and not http_change and nb_coches_tables == 0,
+                key="btn_appliquer_tout",
+            ):
+                erreurs = []
+                xml_modifie = xml_content
+
+                if catalogue_change:
+                    try:
+                        xml_modifie, nb_cat = remplacer_catalogue(
+                            xml_modifie, catalogue_source, catalogue_cible.strip()
+                        )
+                    except ValueError as e:
+                        erreurs.append(T["conn_err_catalog"].format(e))
+
+                if serveur_change or http_change:
+                    try:
+                        xml_modifie, nb_srv = remplacer_serveur(
+                            xml_modifie,
+                            conn_ref["server"], serveur_cible.strip(),
+                            conn_ref["http_path"], http_path_cible.strip(),
+                        )
+                    except ValueError as e:
+                        erreurs.append(T["conn_err_server"].format(e))
+
+                if nb_coches_tables:
+                    selection = edited_tables[edited_tables["Modifier"]].to_dict("records")
+                    try:
+                        xml_modifie, nb_tab = remplacer_tables(xml_modifie, selection)
+                    except ValueError as e:
+                        erreurs.append(T["conn_err_tables"].format(e))
+
+                if erreurs:
+                    for err in erreurs:
+                        st.error(err)
+                else:
+                    msgs = []
+                    if catalogue_change:
+                        s = "s" if nb_cat > 1 else ""
+                        msgs.append(T["conn_ok_catalog"].format(n=nb_cat, s=s))
+                    if serveur_change or http_change:
+                        msgs.append(T["conn_ok_server"])
+                    if nb_coches_tables:
+                        s = "s" if nb_tab > 1 else ""
+                        msgs.append(T["conn_ok_tables"].format(n=nb_tab, s=s))
+                    st.success("✅ " + " · ".join(msgs) + ".")
+                    
+                    nom_base = xml_file.name.replace(".twbx", "").replace(".twb", "").replace(".tds", "")
+                    
+                    # Déterminer le format de sortie et préparer le fichier
+                    if _is_tds:
+                        nom_ext = ".tds"
+                        mime = "application/xml"
+                        fichier_telecharge = xml_modifie
+                    elif st.session_state.get("format_entree") == "twbx" and st.session_state.get("ressources_twbx"):
+                        nom_ext = ".twbx"
+                        mime = "application/zip"
+                        fichier_telecharge = remballer_twbx(xml_modifie, st.session_state["ressources_twbx"])
+                    else:
+                        nom_ext = ".twb"
+                        mime = "application/xml"
+                        fichier_telecharge = xml_modifie
+                    
+                    st.download_button(
+                        label=T["conn_download"],
+                        data=fichier_telecharge,
+                        file_name=f"{nom_base}{T['conn_suffix']}{nom_ext}",
+                        mime=mime,
+                        key="dl_connexion",
+                    )
+
+
+    # ── Footer ────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style="text-align: center; color: #888; font-size: 0.78rem; padding: 4px 0 12px 0;">
+            Tableau Toolkit · <strong>dev version</strong> &nbsp;|&nbsp;
+            © Idir Saidani &amp; AI
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+if __name__ == "__main__":
+    main()
