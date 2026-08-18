@@ -187,25 +187,36 @@ def appliquer_modifications_filtres(xml_content: bytes, df_edited: pd.DataFrame,
 
             mode_xml, show_apply = modifs[key]
 
-            if mode_xml == "":
-                zone.attrib.pop("mode", None)
-            else:
-                zone.set("mode", mode_xml)
-
             if mode_xml == "typeinlist":
-                # saisie texte : valeurs tapées, pas chargées depuis la DB
-                zone.set("values", "typed-value")
-                zone.attrib.pop("show-all", None)
-                zone.attrib.pop("show-apply", None)
-                for zs in zone.findall("zone-style"):
-                    zone.remove(zs)
+                # Reconstruire la zone depuis zéro pour garantir une structure propre
+                parent_map = {c: p for p in root.iter() for c in p}
+                parent = parent_map.get(zone)
+                if parent is not None:
+                    idx = list(parent).index(zone)
+                    parent.remove(zone)
+                    nz = ET.Element("zone")
+                    nz.set("h",      zone.get("h", "6222"))
+                    nz.set("id",     zone.get("id", ""))
+                    nz.set("mode",   "typeinlist")
+                    nz.set("name",   zone.get("name", ""))
+                    nz.set("param",  param)
+                    nz.set("type-v2", "filter")
+                    nz.set("values", "typed-value")
+                    nz.set("w",      zone.get("w", "11716"))
+                    nz.set("x",      zone.get("x", "0"))
+                    nz.set("y",      zone.get("y", "0"))
+                    parent.insert(idx, nz)
             else:
+                if mode_xml == "":
+                    zone.attrib.pop("mode", None)
+                else:
+                    zone.set("mode", mode_xml)
+
                 zone.set("values", "database")
                 if show_apply:
                     zone.set("show-apply", "true")
                 else:
                     zone.attrib.pop("show-apply", None)
-                # restaurer <zone-style> si le filtre venait d'être en typeinlist
                 if zone.find("zone-style") is None:
                     ET.SubElement(zone, "zone-style")
 

@@ -384,6 +384,7 @@ def main():
                                 mask = pd.Series([True] * len(df), index=df.index)
                             df.loc[mask, "Nouveau mode"]      = mode_global
                             df.loc[mask, "Bouton Appliquer"]  = apply_global
+                            df.loc[mask, "Modifier"]          = True
                             st.session_state["df_filtres"] = df
                             st.rerun()
 
