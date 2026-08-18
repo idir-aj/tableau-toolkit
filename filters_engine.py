@@ -179,48 +179,62 @@ def appliquer_modifications_filtres(xml_content: bytes, df_edited: pd.DataFrame,
 
     for dashboard in root.findall(".//dashboard"):
         dashboard_name = dashboard.get("name")
-        for zone in dashboard.findall(".//zone[@type-v2='filter']"):
-            param = zone.get("param", "")
-            key   = (dashboard_name, param)
-            if key not in modifs:
-                continue
 
-            mode_xml, show_apply = modifs[key]
-
-            if mode_xml == "typeinlist":
-                # Sauvegarder les attributs de position avant de tout vider
-                orig_h    = zone.get("h",    "6222")
-                orig_id   = zone.get("id",   "")
-                orig_name = zone.get("name", "")
-                orig_w    = zone.get("w",    "11716")
-                orig_x    = zone.get("x",    "0")
-                orig_y    = zone.get("y",    "0")
-                for child in list(zone):
-                    zone.remove(child)
-                zone.attrib.clear()
-                zone.set("h",       orig_h)
-                zone.set("id",      orig_id)
-                zone.set("mode",    "typeinlist")
-                zone.set("name",    orig_name)
-                zone.set("param",   param)
-                zone.set("type-v2", "filter")
-                zone.set("values",  "typed-value")
-                zone.set("w",       orig_w)
-                zone.set("x",       orig_x)
-                zone.set("y",       orig_y)
-            else:
-                if mode_xml == "":
-                    zone.attrib.pop("mode", None)
+        # Zones principales : modification complète
+        main_zones = dashboard.find("zones")
+        if main_zones is not None:
+            for zone in main_zones.iter("zone"):
+                if zone.get("type-v2") != "filter":
+                    continue
+                param = zone.get("param", "")
+                key   = (dashboard_name, param)
+                if key not in modifs:
+                    continue
+                mode_xml, show_apply = modifs[key]
+                if mode_xml == "typeinlist":
+                    orig_h    = zone.get("h",    "6222")
+                    orig_id   = zone.get("id",   "")
+                    orig_name = zone.get("name", "")
+                    orig_w    = zone.get("w",    "11716")
+                    orig_x    = zone.get("x",    "0")
+                    orig_y    = zone.get("y",    "0")
+                    for child in list(zone):
+                        zone.remove(child)
+                    zone.attrib.clear()
+                    zone.set("h",       orig_h)
+                    zone.set("id",      orig_id)
+                    zone.set("mode",    "typeinlist")
+                    zone.set("name",    orig_name)
+                    zone.set("param",   param)
+                    zone.set("type-v2", "filter")
+                    zone.set("values",  "typed-value")
+                    zone.set("w",       orig_w)
+                    zone.set("x",       orig_x)
+                    zone.set("y",       orig_y)
                 else:
-                    zone.set("mode", mode_xml)
+                    if mode_xml == "":
+                        zone.attrib.pop("mode", None)
+                    else:
+                        zone.set("mode", mode_xml)
+                    zone.set("values", "database")
+                    if show_apply:
+                        zone.set("show-apply", "true")
+                    else:
+                        zone.attrib.pop("show-apply", None)
+                    if zone.find("zone-style") is None:
+                        ET.SubElement(zone, "zone-style")
 
-                zone.set("values", "database")
-                if show_apply:
-                    zone.set("show-apply", "true")
-                else:
-                    zone.attrib.pop("show-apply", None)
-                if zone.find("zone-style") is None:
-                    ET.SubElement(zone, "zone-style")
+        # Zones des device layouts : seulement mettre à jour 'values', ne pas toucher mode ni structure
+        for dev_zones in dashboard.findall("devicelayouts/devicelayout/zones"):
+            for zone in dev_zones.iter("zone"):
+                if zone.get("type-v2") != "filter":
+                    continue
+                param = zone.get("param", "")
+                key   = (dashboard_name, param)
+                if key not in modifs:
+                    continue
+                mode_xml, _ = modifs[key]
+                zone.set("values", "typed-value" if mode_xml == "typeinlist" else "database")
 
     return serialiser_xml(tree)
 
