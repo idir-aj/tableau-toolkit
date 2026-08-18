@@ -188,24 +188,26 @@ def appliquer_modifications_filtres(xml_content: bytes, df_edited: pd.DataFrame,
             mode_xml, show_apply = modifs[key]
 
             if mode_xml == "typeinlist":
-                # Reconstruire la zone depuis zéro pour garantir une structure propre
-                parent_map = {c: p for p in root.iter() for c in p}
-                parent = parent_map.get(zone)
-                if parent is not None:
-                    idx = list(parent).index(zone)
-                    parent.remove(zone)
-                    nz = ET.Element("zone")
-                    nz.set("h",      zone.get("h", "6222"))
-                    nz.set("id",     zone.get("id", ""))
-                    nz.set("mode",   "typeinlist")
-                    nz.set("name",   zone.get("name", ""))
-                    nz.set("param",  param)
-                    nz.set("type-v2", "filter")
-                    nz.set("values", "typed-value")
-                    nz.set("w",      zone.get("w", "11716"))
-                    nz.set("x",      zone.get("x", "0"))
-                    nz.set("y",      zone.get("y", "0"))
-                    parent.insert(idx, nz)
+                # Sauvegarder les attributs de position avant de tout vider
+                orig_h    = zone.get("h",    "6222")
+                orig_id   = zone.get("id",   "")
+                orig_name = zone.get("name", "")
+                orig_w    = zone.get("w",    "11716")
+                orig_x    = zone.get("x",    "0")
+                orig_y    = zone.get("y",    "0")
+                for child in list(zone):
+                    zone.remove(child)
+                zone.attrib.clear()
+                zone.set("h",       orig_h)
+                zone.set("id",      orig_id)
+                zone.set("mode",    "typeinlist")
+                zone.set("name",    orig_name)
+                zone.set("param",   param)
+                zone.set("type-v2", "filter")
+                zone.set("values",  "typed-value")
+                zone.set("w",       orig_w)
+                zone.set("x",       orig_x)
+                zone.set("y",       orig_y)
             else:
                 if mode_xml == "":
                     zone.attrib.pop("mode", None)
