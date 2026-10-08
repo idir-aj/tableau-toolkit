@@ -48,10 +48,10 @@ input:focus-visible,select:focus-visible,button:focus-visible,.node:focus-visibl
 .heads div{position:absolute;top:6px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);line-height:1.25}
 .heads div b{display:block;color:var(--ink2);font-weight:500;letter-spacing:0;text-transform:none;font-size:12px}
 svg{display:block}
-.edge{fill:none;stroke:var(--edge);stroke-width:1;opacity:.11;transition:opacity .12s}
+.edge{fill:none;stroke:var(--edge);stroke-width:1;opacity:.11}
 .edge.on{opacity:.85;stroke:var(--hit);stroke-width:1.4}
 .dimmed .edge:not(.on){opacity:.025}
-.node{cursor:pointer}
+.node{cursor:pointer;user-select:none;-webkit-user-select:none}
 .node rect{fill:color-mix(in srgb,var(--c) 16%,var(--panel));stroke:var(--c);stroke-width:1.2}
 .node.inter rect{stroke-dasharray:3 2;fill:color-mix(in srgb,var(--c) 6%,var(--panel))}
 .node text{font-size:11.5px;fill:var(--ink);font-family:var(--font);pointer-events:none}
@@ -61,7 +61,15 @@ svg{display:block}
 .node.sel rect{stroke:var(--hit);stroke-width:2.4}
 .k-src{--c:var(--src)}.k-par{--c:var(--par)}.k-calc{--c:var(--calc)}.k-use{--c:var(--use)}
 .count{color:var(--ink3);font-size:12px;margin-top:8px}
-@media (prefers-reduced-motion:reduce){.edge{transition:none}}
+.node.hid,.edge.hid{display:none}
+.btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:6px;padding:8px 12px;cursor:pointer;align-self:flex-end}
+.btn[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.btn:disabled{opacity:.45;cursor:default}
+.info .acts{margin-top:8px}
+.info .acts .btn{padding:5px 10px;font-size:12.5px}
+body.fs{max-width:none;padding-block:10px}
+body.fs h1,body.fs .sub{display:none}
+
 </style>
 </head>
 <body>
@@ -71,6 +79,8 @@ svg{display:block}
   <div class="field"><label for="q" data-i="search"></label><input id="q" type="search"></div>
   <div class="field"><label for="dsel" data-i="dash_filter"></label><select id="dsel"><option value="" data-i="all_dash"></option></select></div>
   <div class="field"><label data-i="labels"></label><div class="seg" role="group"><button id="bNew" aria-pressed="true" data-i="caption"></button><button id="bCur" aria-pressed="false" data-i="internal"></button></div></div>
+  <button class="btn" id="focusBtn" aria-pressed="false" disabled data-i="focus"></button>
+  <button class="btn" id="fsBtn" aria-pressed="false" data-i="fullscreen"></button>
   <button class="reset" id="reset" data-i="reset"></button>
 </div>
 <div class="legend">
@@ -108,17 +118,19 @@ document.getElementById('inner').style.width=W+'px';
 const shortStr=(s,m)=>s.length>m?s.slice(0,m-1)+'…':s;
 const cls=n=>n.kind==='source'?'k-src':n.kind==='param'?'k-par':(['sheet','action','zone','join','dash'].includes(n.kind)?'k-use':'k-calc');
 // positions
-DATA.nodes.forEach(n=>{n.x=cx(n.col);n.y=TOP+n.y});
+DATA.nodes.forEach(n=>{n.x=cx(n.col);n.y0=TOP+n.y;n.y=n.y0});
 // heads
 const heads=document.getElementById('heads');
 const colName=c=>c===0?[I.col_src,I.col_src_sub]:c===UL?[I.col_use,I.col_use_sub]:c===UL+1?[I.col_dash,I.col_dash_sub]:[I.col_calc,I.col_level+' '+c];
 for(let c=0;c<NCOL;c++){const [a,b]=colName(c);const d=document.createElement('div');d.style.left=cx(c)+'px';d.style.width=NW+'px';
-  d.innerHTML=`${a}<b>${b} · ${DATA.nodes.filter(n=>n.col===c).length}</b>`;heads.appendChild(d)}
+  d.dataset.sub=b;d.innerHTML=`${a}<b>${b} · ${DATA.nodes.filter(n=>n.col===c).length}</b>`;heads.appendChild(d)}
 // edges
 const gE=document.createElementNS(NS,'g'),gN=document.createElementNS(NS,'g');svg.append(gE,gN);
-const edgeEls=DATA.edges.map(([a,b])=>{const A=N.get(a),B=N.get(b);
+const edgeEls=DATA.edges.map(([a,b])=>{const p=document.createElementNS(NS,'path');p.setAttribute('class','edge');gE.appendChild(p);return {a,b,p,on:false,hid:false}});
+function drawEdges(){edgeEls.forEach(e=>{const A=N.get(e.a),B=N.get(e.b);
   const x1=A.x+NW,y1=A.y+NH/2,x2=B.x,y2=B.y+NH/2,dx=Math.max(30,(x2-x1)*.5);
-  const p=document.createElementNS(NS,'path');p.setAttribute('d',`M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`);p.setAttribute('class','edge');gE.appendChild(p);return {a,b,p}});
+  e.p.setAttribute('d',`M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`)})}
+drawEdges();
 // nodes
 const nodeEls=new Map();
 DATA.nodes.forEach(n=>{
@@ -134,20 +146,27 @@ DATA.nodes.forEach(n=>{
   if(mk){mk.setAttribute('class','mk');g.appendChild(mk)}
   const t=document.createElementNS(NS,'text');t.setAttribute('x',mk?22:9);t.setAttribute('y',NH/2+4);g.appendChild(t);
   const ti=document.createElementNS(NS,'title');g.appendChild(ti);
-  g.addEventListener('mouseenter',()=>{if(pinned===null&&!filterSet&&!qActive)show(n.id)});
-  g.addEventListener('mouseleave',()=>{if(pinned===null&&!filterSet&&!qActive)clearAll()});
-  g.addEventListener('click',()=>{pinned=(pinned===n.id)?null:n.id;pinned?show(n.id,true):clearAll();renderInfo(pinned?n:null);if(pinned)reveal(n.id)});
+  g.addEventListener('mouseenter',()=>{clearTimeout(hoverT);hoverT=setTimeout(()=>{if(pinned===null&&!filterSet&&!qActive&&!focusId)show(n.id)},90)});
+  g.addEventListener('mouseleave',()=>{clearTimeout(hoverT);hoverT=setTimeout(()=>{if(pinned===null&&!filterSet&&!qActive&&!focusId)clearAll()},90)});
+  g.addEventListener('click',()=>{pinned=(pinned===n.id)?null:n.id;if(pinned){show(n.id,true);renderInfo(n);if(!focusId)reveal(n.id)}else{focusId?focusShow():clearAll()}syncFocusBtn()});
+  g.addEventListener('dblclick',()=>{pinned=n.id;enterFocus(n.id)});
   g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();g.dispatchEvent(new Event('click'))}});
   gN.appendChild(g);nodeEls.set(n.id,{g,t,ti,n});
 });
 function label(n){return useLabel?n.label:n.name}
 function relabel(){nodeEls.forEach(({t,ti,n})=>{const L=label(n);t.textContent=shortStr(L,n.kind==='source'||n.kind==='calc'||n.kind==='param'||n.kind==='group'?30:30);ti.textContent=L+(useLabel&&n.name!==n.label?`\n(${n.name})`:'')})}
-function walk(id,map){const seen=new Set();const st=[id];while(st.length){const x=st.pop();for(const y of map.get(x)){if(!seen.has(y)){seen.add(y);st.push(y)}}}return seen}
+let hoverT=null,focusId=null;
+const memo=new Map();
+function walk(id,map){const key=(map===inn?'i':'o')+id;if(memo.has(key))return new Set(memo.get(key));const seen=new Set();const st=[id];while(st.length){const x=st.pop();for(const y of map.get(x)){if(!seen.has(y)){seen.add(y);st.push(y)}}}memo.set(key,seen);return new Set(seen)}
+let lastOn=new Set(),lastSel=null;
 function apply(sets,sel){
   const on=new Set();sets.forEach(s=>s.forEach(x=>on.add(x)));
   svg.classList.add('dimmed');
-  nodeEls.forEach(({g},id)=>{g.classList.toggle('on',on.has(id));g.classList.toggle('sel',id===sel)});
-  edgeEls.forEach(e=>{e.p.classList.toggle('on',sets.some(s=>s.has(e.a)&&s.has(e.b)))});
+  lastOn.forEach(id=>{if(!on.has(id))nodeEls.get(id).g.classList.remove('on')});
+  on.forEach(id=>{if(!lastOn.has(id))nodeEls.get(id).g.classList.add('on')});
+  if(lastSel!==sel){if(lastSel)nodeEls.get(lastSel)?.g.classList.remove('sel');if(sel)nodeEls.get(sel)?.g.classList.add('sel')}
+  lastOn=on;lastSel=sel;
+  edgeEls.forEach(e=>{const v=on.has(e.a)&&on.has(e.b)&&sets.some(s=>s.has(e.a)&&s.has(e.b));if(v!==e.on){e.on=v;e.p.classList.toggle('on',v)}});
 }
 function reveal(id){const e=nodeEls.get(id);if(!e)return;const sc=document.getElementById('scroller');const n=e.n;sc.scrollTo({top:Math.max(0,n.y-sc.clientHeight/2),left:Math.max(0,n.x-sc.clientWidth/3),behavior:'smooth'})}
 function show(id,withInfo){
@@ -155,7 +174,8 @@ function show(id,withInfo){
   apply([A,D],id);if(!withInfo)renderInfo(N.get(id));
 }
 function clearAll(){
-  svg.classList.remove('dimmed');nodeEls.forEach(({g})=>g.classList.remove('on','sel'));edgeEls.forEach(e=>e.p.classList.remove('on'));
+  svg.classList.remove('dimmed');nodeEls.forEach(({g})=>g.classList.remove('on','sel'));edgeEls.forEach(e=>{e.on=false;e.p.classList.remove('on')});
+  lastOn=new Set();lastSel=null;
   renderInfo(null);
 }
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -177,9 +197,10 @@ function renderInfo(n){
     if(n.hidden)h+=`<br>${esc(I.i_hidden)}`;
   }
   h+=`<br>${esc(f('i_up',{a:A.size,s:up}))}<br>${esc(f('i_down',{sh:cnt('sheet'),da:cnt('dash'),ac:cnt('action'),zo:cnt('zone')}))}`;
-  h+=`</div></div><div>`;
+  h+=`</div><div class="acts"><button class="btn" id="infoFocus">${esc(focusId===n.id?I.unfocus:I.focus)}</button></div></div><div>`;
   h+=n.formula?`<pre>${esc(n.formula)}</pre>`:`<div class="hint">${esc(isField?I.i_nof:I.i_dash_hint)}</div>`;
   h+=`</div>`;el.innerHTML=h;
+  document.getElementById('infoFocus').addEventListener('click',()=>{focusId===n.id?exitFocus():enterFocus(n.id)});
 }
 // search + filters
 let qActive=false;
@@ -199,11 +220,58 @@ function refreshFilters(){
 function cnt(n){document.getElementById('count').textContent=n==null?f('n_nodes',{n:DATA.nodes.length,e:DATA.edges.length}):f('n_hi',{n})}
 q.addEventListener('input',()=>{pinned=null;refreshFilters()});
 dsel.addEventListener('change',()=>{pinned=null;refreshFilters()});
-document.getElementById('reset').addEventListener('click',()=>{q.value='';dsel.value='';pinned=null;refreshFilters()});
+document.getElementById('reset').addEventListener('click',()=>{q.value='';dsel.value='';pinned=null;if(focusId){focusId=null;relayout(null)}refreshFilters();syncFocusBtn()});
 function setNames(v){useLabel=v;document.getElementById('bNew').setAttribute('aria-pressed',v);document.getElementById('bCur').setAttribute('aria-pressed',!v);relabel();const sel=pinned&&N.get(pinned);if(sel)renderInfo(sel)}
 document.getElementById('bNew').addEventListener('click',()=>setNames(true));
 document.getElementById('bCur').addEventListener('click',()=>setNames(false));
-relabel();cnt(null);
+
+// ── focus : ne garder que le lignage du nœud sélectionné ──
+function relayout(vis){
+  const cols=new Map();
+  DATA.nodes.forEach(n=>{const show=!vis||vis.has(n.id);nodeEls.get(n.id).g.classList.toggle('hid',!show);if(show){if(!cols.has(n.col))cols.set(n.col,[]);cols.get(n.col).push(n)}});
+  const used=[...cols.keys()].sort((x,y)=>x-y), pos=new Map(used.map((c,i)=>[c,i]));
+  let maxY=0;
+  DATA.nodes.forEach(n=>{n.x=cx(vis?(pos.get(n.col)??0):n.col)});
+  if(!vis){DATA.nodes.forEach(n=>{n.y=n.y0});}
+  else{cols.forEach(arr=>{arr.sort((a,b)=>a.y0-b.y0);arr.forEach((n,i)=>{n.y=TOP+i*RH})})}
+  DATA.nodes.forEach(n=>{if(!vis||vis.has(n.id)){maxY=Math.max(maxY,n.y);nodeEls.get(n.id).g.setAttribute('transform',`translate(${n.x},${n.y})`)}});
+  edgeEls.forEach(e=>{const h=!!vis&&!(vis.has(e.a)&&vis.has(e.b));e.hid=h;e.p.classList.toggle('hid',h)});
+  drawEdges();
+  const k=vis?used.length:NCOL, W2=LEFT*2+k*NW+(k-1)*GAP, Hh=maxY+NH+20;
+  svg.setAttribute('width',W2);svg.setAttribute('height',Hh);svg.setAttribute('viewBox',`0 0 ${W2} ${Hh}`);
+  document.getElementById('inner').style.width=W2+'px';
+  document.getElementById('heads').querySelectorAll('div').forEach((d,c)=>{
+    const show=!vis||pos.has(c);d.style.display=show?'':'none';
+    if(show){d.style.left=cx(vis?pos.get(c):c)+'px';d.querySelector('b').lastChild.textContent=(d.dataset.sub||'')+' · '+(cols.get(c)||DATA.nodes.filter(n=>n.col===c)).length}});
+}
+function focusShow(){const A=walk(focusId,inn),D=walk(focusId,out);A.add(focusId);D.add(focusId);apply([A,D],focusId);renderInfo(N.get(pinned||focusId))}
+function enterFocus(id){
+  focusId=id;const A=walk(id,inn),D=walk(id,out);const vis=new Set([...A,...D,id]);
+  relayout(vis);focusShow();document.getElementById('scroller').scrollTo({top:0,left:0});
+  cnt(vis.size);syncFocusBtn();
+}
+function exitFocus(){
+  focusId=null;relayout(null);cnt(null);
+  pinned?show(pinned,true):clearAll();
+  if(pinned){renderInfo(N.get(pinned));reveal(pinned)}
+  syncFocusBtn();
+}
+function syncFocusBtn(){
+  const b=document.getElementById('focusBtn');
+  b.disabled=!focusId&&!pinned;b.setAttribute('aria-pressed',!!focusId);
+  b.textContent=focusId?I.unfocus:I.focus;
+  const ib=document.getElementById('infoFocus');if(ib)ib.textContent=focusId===pinned||(focusId&&!pinned)?I.unfocus:I.focus;
+}
+document.getElementById('focusBtn').addEventListener('click',()=>{focusId?exitFocus():(pinned&&enterFocus(pinned))});
+// ── plein écran ──
+const fsBtn=document.getElementById('fsBtn'),sc=document.getElementById('scroller');
+function fitHeight(){const fs=!!document.fullscreenElement;document.body.classList.toggle('fs',fs);fsBtn.setAttribute('aria-pressed',fs);fsBtn.textContent=fs?I.exit_fullscreen:I.fullscreen;
+  if(fs){requestAnimationFrame(()=>{sc.style.height=Math.max(300,innerHeight-sc.getBoundingClientRect().top-34)+'px'})}else{sc.style.height=''}}
+fsBtn.addEventListener('click',()=>{if(document.fullscreenElement){document.exitFullscreen()}else if(document.documentElement.requestFullscreen){document.documentElement.requestFullscreen().catch(()=>{})}});
+document.addEventListener('fullscreenchange',fitHeight);addEventListener('resize',()=>{if(document.fullscreenElement)fitHeight()});
+if(!document.fullscreenEnabled)fsBtn.style.display='none';
+addEventListener('keydown',e=>{if(e.key==='Escape'&&focusId&&!document.fullscreenElement)exitFocus()});
+relabel();cnt(null);syncFocusBtn();
 </script>
 
 </body>
