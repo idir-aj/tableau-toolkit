@@ -62,6 +62,7 @@ svg{display:block}
 .k-src{--c:var(--src)}.k-par{--c:var(--par)}.k-calc{--c:var(--calc)}.k-use{--c:var(--use)}
 .count{color:var(--ink3);font-size:12px;margin-top:8px}
 .node.hid,.edge.hid{display:none}
+.free .node{cursor:grab;touch-action:none}.free .node.drag{cursor:grabbing}.free .heads{display:none}
 .btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:6px;padding:8px 12px;cursor:pointer;align-self:flex-end}
 .btn[aria-pressed=true]{background:var(--ink);color:var(--bg)}
 .btn:disabled{opacity:.45;cursor:default}
@@ -79,6 +80,10 @@ body.fs h1,body.fs .sub{display:none}
   <div class="field"><label for="q" data-i="search"></label><input id="q" type="search"></div>
   <div class="field"><label for="dsel" data-i="dash_filter"></label><select id="dsel"><option value="" data-i="all_dash"></option></select></div>
   <div class="field"><label data-i="labels"></label><div class="seg" role="group"><button id="bNew" aria-pressed="true" data-i="caption"></button><button id="bCur" aria-pressed="false" data-i="internal"></button></div></div>
+  <div class="field"><label data-i="types"></label><div class="seg" role="group" id="types">
+    <button data-t="src" aria-pressed="true" data-i="t_src"></button><button data-t="calc" aria-pressed="true" data-i="t_calc"></button><button data-t="use" aria-pressed="true" data-i="t_use"></button><button data-t="dash" aria-pressed="true" data-i="t_dash"></button></div></div>
+  <div class="field"><label data-i="layout"></label><div class="seg" role="group"><button id="lCols" aria-pressed="true" data-i="l_cols"></button><button id="lFree" aria-pressed="false" data-i="l_free"></button></div></div>
+  <button class="btn" id="tidyBtn" data-i="tidy" style="display:none"></button>
   <button class="btn" id="focusBtn" aria-pressed="false" disabled data-i="focus"></button>
   <button class="btn" id="fsBtn" aria-pressed="false" data-i="fullscreen"></button>
   <button class="reset" id="reset" data-i="reset"></button>
@@ -127,9 +132,11 @@ for(let c=0;c<NCOL;c++){const [a,b]=colName(c);const d=document.createElement('d
 // edges
 const gE=document.createElementNS(NS,'g'),gN=document.createElementNS(NS,'g');svg.append(gE,gN);
 const edgeEls=DATA.edges.map(([a,b])=>{const p=document.createElementNS(NS,'path');p.setAttribute('class','edge');gE.appendChild(p);return {a,b,p,on:false,hid:false}});
-function drawEdges(){edgeEls.forEach(e=>{const A=N.get(e.a),B=N.get(e.b);
+const nodeEdges=new Map();edgeEls.forEach(e=>{[e.a,e.b].forEach(i=>{if(!nodeEdges.has(i))nodeEdges.set(i,[]);nodeEdges.get(i).push(e)})});
+function drawEdge(e){const A=N.get(e.a),B=N.get(e.b);
   const x1=A.x+NW,y1=A.y+NH/2,x2=B.x,y2=B.y+NH/2,dx=Math.max(30,(x2-x1)*.5);
-  e.p.setAttribute('d',`M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`)})}
+  e.p.setAttribute('d',`M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`)}
+function drawEdges(){edgeEls.forEach(drawEdge)}
 drawEdges();
 // nodes
 const nodeEls=new Map();
@@ -146,16 +153,22 @@ DATA.nodes.forEach(n=>{
   if(mk){mk.setAttribute('class','mk');g.appendChild(mk)}
   const t=document.createElementNS(NS,'text');t.setAttribute('x',mk?22:9);t.setAttribute('y',NH/2+4);g.appendChild(t);
   const ti=document.createElementNS(NS,'title');g.appendChild(ti);
-  g.addEventListener('mouseenter',()=>{clearTimeout(hoverT);hoverT=setTimeout(()=>{if(pinned===null&&!filterSet&&!qActive&&!focusId)show(n.id)},90)});
-  g.addEventListener('mouseleave',()=>{clearTimeout(hoverT);hoverT=setTimeout(()=>{if(pinned===null&&!filterSet&&!qActive&&!focusId)clearAll()},90)});
-  g.addEventListener('click',()=>{pinned=(pinned===n.id)?null:n.id;if(pinned){show(n.id,true);renderInfo(n);if(!focusId)reveal(n.id)}else{focusId?focusShow():clearAll()}syncFocusBtn()});
+  g.addEventListener('click',()=>{if(suppressClick)return;pinned=(pinned===n.id)?null:n.id;if(pinned){show(n.id,true);renderInfo(n);if(!focusId)reveal(n.id)}else{focusId?focusShow():clearAll()}syncFocusBtn()});
+  g.addEventListener('pointerdown',ev=>{if(layoutMode!=='free'||ev.button!==0)return;drag={n,sx:ev.clientX,sy:ev.clientY,ox:n.x,oy:n.y,moved:false};g.setPointerCapture(ev.pointerId)});
+  g.addEventListener('pointermove',ev=>{if(!drag||drag.n!==n)return;const dx=ev.clientX-drag.sx,dy=ev.clientY-drag.sy;if(!drag.moved&&Math.hypot(dx,dy)<4)return;
+    if(!drag.moved){drag.moved=true;g.classList.add('drag')}
+    n.x=n.fx=Math.max(0,drag.ox+dx);n.y=n.fy=Math.max(0,drag.oy+dy);g.setAttribute('transform',`translate(${n.x},${n.y})`);(nodeEdges.get(n.id)||[]).forEach(drawEdge)});
+  const endDrag=()=>{if(drag&&drag.n===n){g.classList.remove('drag');if(drag.moved){suppressClick=true;setTimeout(()=>{suppressClick=false},0);fitSvg()}drag=null}};
+  g.addEventListener('pointerup',endDrag);g.addEventListener('pointercancel',endDrag);
   g.addEventListener('dblclick',()=>{pinned=n.id;enterFocus(n.id)});
   g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();g.dispatchEvent(new Event('click'))}});
   gN.appendChild(g);nodeEls.set(n.id,{g,t,ti,n});
 });
 function label(n){return useLabel?n.label:n.name}
 function relabel(){nodeEls.forEach(({t,ti,n})=>{const L=label(n);t.textContent=shortStr(L,n.kind==='source'||n.kind==='calc'||n.kind==='param'||n.kind==='group'?30:30);ti.textContent=L+(useLabel&&n.name!==n.label?`\n(${n.name})`:'')})}
-let hoverT=null,focusId=null;
+let focusId=null,focusVis=null,layoutMode='cols',suppressClick=false,drag=null;
+const grp=n=>n.kind==='source'||n.kind==='param'?'src':(n.kind==='calc'||n.kind==='group'?'calc':(n.kind==='dash'?'dash':'use'));
+const typeOn={src:true,calc:true,use:true,dash:true};
 const memo=new Map();
 function walk(id,map){const key=(map===inn?'i':'o')+id;if(memo.has(key))return new Set(memo.get(key));const seen=new Set();const st=[id];while(st.length){const x=st.pop();for(const y of map.get(x)){if(!seen.has(y)){seen.add(y);st.push(y)}}}memo.set(key,seen);return new Set(seen)}
 let lastOn=new Set(),lastSel=null;
@@ -217,41 +230,49 @@ function refreshFilters(){
     renderInfo(m.length===1?m[0]:null);cnt(m.length);return}
   pinned?show(pinned,true):clearAll();cnt(null);
 }
-function cnt(n){document.getElementById('count').textContent=n==null?f('n_nodes',{n:DATA.nodes.length,e:DATA.edges.length}):f('n_hi',{n})}
+function cnt(n){const vn=DATA.nodes.filter(x=>x._s!==false).length,ve=edgeEls.filter(e=>!e.hid).length;document.getElementById('count').textContent=n==null?f('n_nodes',{n:vn,e:ve}):f('n_hi',{n})}
 q.addEventListener('input',()=>{pinned=null;refreshFilters()});
 dsel.addEventListener('change',()=>{pinned=null;refreshFilters()});
-document.getElementById('reset').addEventListener('click',()=>{q.value='';dsel.value='';pinned=null;if(focusId){focusId=null;relayout(null)}refreshFilters();syncFocusBtn()});
+document.getElementById('reset').addEventListener('click',()=>{q.value='';dsel.value='';pinned=null;focusId=null;focusVis=null;Object.keys(typeOn).forEach(k=>typeOn[k]=true);document.querySelectorAll('#types button').forEach(b=>b.setAttribute('aria-pressed',true));DATA.nodes.forEach(n=>{n.fx=n.fy=null});layout();refreshFilters();syncFocusBtn()});
 function setNames(v){useLabel=v;document.getElementById('bNew').setAttribute('aria-pressed',v);document.getElementById('bCur').setAttribute('aria-pressed',!v);relabel();const sel=pinned&&N.get(pinned);if(sel)renderInfo(sel)}
 document.getElementById('bNew').addEventListener('click',()=>setNames(true));
 document.getElementById('bCur').addEventListener('click',()=>setNames(false));
 
 // ── focus : ne garder que le lignage du nœud sélectionné ──
-function relayout(vis){
-  const cols=new Map();
-  DATA.nodes.forEach(n=>{const show=!vis||vis.has(n.id);nodeEls.get(n.id).g.classList.toggle('hid',!show);if(show){if(!cols.has(n.col))cols.set(n.col,[]);cols.get(n.col).push(n)}});
-  const used=[...cols.keys()].sort((x,y)=>x-y), pos=new Map(used.map((c,i)=>[c,i]));
-  let maxY=0;
-  DATA.nodes.forEach(n=>{n.x=cx(vis?(pos.get(n.col)??0):n.col)});
-  if(!vis){DATA.nodes.forEach(n=>{n.y=n.y0});}
-  else{cols.forEach(arr=>{arr.sort((a,b)=>a.y0-b.y0);arr.forEach((n,i)=>{n.y=TOP+i*RH})})}
-  DATA.nodes.forEach(n=>{if(!vis||vis.has(n.id)){maxY=Math.max(maxY,n.y);nodeEls.get(n.id).g.setAttribute('transform',`translate(${n.x},${n.y})`)}});
-  edgeEls.forEach(e=>{const h=!!vis&&!(vis.has(e.a)&&vis.has(e.b));e.hid=h;e.p.classList.toggle('hid',h)});
-  drawEdges();
-  const k=vis?used.length:NCOL, W2=LEFT*2+k*NW+(k-1)*GAP, Hh=maxY+NH+20;
+let baseW=W;
+function relayout(vis){focusVis=vis;layout()}
+function fitSvg(){
+  let mx=0,my=0;DATA.nodes.forEach(n=>{if(n._s){mx=Math.max(mx,n.x);my=Math.max(my,n.y)}});
+  const W2=Math.max(baseW,mx+NW+LEFT),Hh=my+NH+20;
   svg.setAttribute('width',W2);svg.setAttribute('height',Hh);svg.setAttribute('viewBox',`0 0 ${W2} ${Hh}`);
   document.getElementById('inner').style.width=W2+'px';
+}
+function layout(){
+  const free=layoutMode==='free',filtered=!!focusVis||Object.values(typeOn).some(v=>!v);
+  const cols=new Map();
+  DATA.nodes.forEach(n=>{n._s=(!focusVis||focusVis.has(n.id))&&typeOn[grp(n)];nodeEls.get(n.id).g.classList.toggle('hid',!n._s);if(n._s){if(!cols.has(n.col))cols.set(n.col,[]);cols.get(n.col).push(n)}});
+  const used=[...cols.keys()].sort((x,y)=>x-y), pos=new Map(used.map((c,i)=>[c,i]));
+  cols.forEach(arr=>{arr.sort((a,b)=>a.y0-b.y0);arr.forEach((n,i)=>{n.by=filtered?TOP+i*RH:n.y0})});
+  DATA.nodes.forEach(n=>{
+    n.bx=cx(filtered?(pos.get(n.col)??0):n.col);
+    n.x=free&&n.fx!=null?n.fx:n.bx;n.y=free&&n.fy!=null?n.fy:(n.by??n.y0);
+    nodeEls.get(n.id).g.setAttribute('transform',`translate(${n.x},${n.y})`)});
+  edgeEls.forEach(e=>{const h=!(N.get(e.a)._s&&N.get(e.b)._s);e.hid=h;e.p.classList.toggle('hid',h)});
+  drawEdges();
+  const k=filtered?Math.max(1,used.length):NCOL;baseW=LEFT*2+k*NW+(k-1)*GAP;fitSvg();
   document.getElementById('heads').querySelectorAll('div').forEach((d,c)=>{
-    const show=!vis||pos.has(c);d.style.display=show?'':'none';
-    if(show){d.style.left=cx(vis?pos.get(c):c)+'px';d.querySelector('b').lastChild.textContent=(d.dataset.sub||'')+' · '+(cols.get(c)||DATA.nodes.filter(n=>n.col===c)).length}});
+    const show=!filtered||pos.has(c);d.style.display=show?'':'none';
+    if(show){d.style.left=cx(filtered?pos.get(c):c)+'px';d.querySelector('b').lastChild.textContent=(d.dataset.sub||'')+' · '+(cols.get(c)||[]).length}});
+  cnt(null);
 }
 function focusShow(){const A=walk(focusId,inn),D=walk(focusId,out);A.add(focusId);D.add(focusId);apply([A,D],focusId);renderInfo(N.get(pinned||focusId))}
 function enterFocus(id){
   focusId=id;const A=walk(id,inn),D=walk(id,out);const vis=new Set([...A,...D,id]);
   relayout(vis);focusShow();document.getElementById('scroller').scrollTo({top:0,left:0});
-  cnt(vis.size);syncFocusBtn();
+  syncFocusBtn();
 }
 function exitFocus(){
-  focusId=null;relayout(null);cnt(null);
+  focusId=null;relayout(null);
   pinned?show(pinned,true):clearAll();
   if(pinned){renderInfo(N.get(pinned));reveal(pinned)}
   syncFocusBtn();
@@ -271,6 +292,18 @@ fsBtn.addEventListener('click',()=>{if(document.fullscreenElement){document.exit
 document.addEventListener('fullscreenchange',fitHeight);addEventListener('resize',()=>{if(document.fullscreenElement)fitHeight()});
 if(!document.fullscreenEnabled)fsBtn.style.display='none';
 addEventListener('keydown',e=>{if(e.key==='Escape'&&focusId&&!document.fullscreenElement)exitFocus()});
+
+document.querySelectorAll('#types button').forEach(b=>b.addEventListener('click',()=>{
+  const t=b.dataset.t;if(typeOn[t]&&Object.values(typeOn).filter(Boolean).length===1)return;
+  typeOn[t]=!typeOn[t];b.setAttribute('aria-pressed',typeOn[t]);layout();if(pinned&&!N.get(pinned)._s)pinned=null;
+  pinned?show(pinned,true):(focusId?focusShow():clearAll());syncFocusBtn()}));
+function setMode(m){
+  layoutMode=m;document.getElementById('inner').classList.toggle('free',m==='free');
+  document.getElementById('lCols').setAttribute('aria-pressed',m==='cols');document.getElementById('lFree').setAttribute('aria-pressed',m==='free');
+  document.getElementById('tidyBtn').style.display=m==='free'?'':'none';layout()}
+document.getElementById('lCols').addEventListener('click',()=>setMode('cols'));
+document.getElementById('lFree').addEventListener('click',()=>setMode('free'));
+document.getElementById('tidyBtn').addEventListener('click',()=>{DATA.nodes.forEach(n=>{n.fx=n.fy=null});layout()});
 relabel();cnt(null);syncFocusBtn();
 </script>
 
