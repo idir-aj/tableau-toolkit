@@ -66,4 +66,4 @@ Each `*_engine.py` is independent of Streamlit: functions take the XML content (
 - Adding a tool: create an `*_engine.py`, add the keys to `translations.py` (FR and EN), then add a tab in `main()` and its session-state keys to the reset list used when the uploaded file changes.
 
 ---
-Tableau Toolkit · dev version · © Idir Saidani & AI
+Tableau Toolkit · © Idir Saidani & AI
