@@ -1,69 +1,69 @@
 # 🧰 Tableau Toolkit
 
-Boîte à outils [Streamlit](https://streamlit.io) pour **modifier et analyser des classeurs Tableau** (`.twb`, `.twbx`) et des sources de données (`.tds`) en agissant directement sur leur XML, sans ouvrir Tableau Desktop. Interface bilingue FR / EN.
+A [Streamlit](https://streamlit.io) toolkit to **modify and analyze Tableau workbooks** (`.twb`, `.twbx`) and data sources (`.tds`) by working directly on their XML, without opening Tableau Desktop. The UI is bilingual (FR / EN).
 
-## Outils
+## Tools
 
-Un seul fichier est uploadé en haut de la page, puis partagé entre les onglets (sauf l'onglet Performances, qui a son propre upload).
+A single file is uploaded at the top of the page and shared across tabs (except the Performance tab, which has its own upload).
 
-| Onglet | Ce que ça fait | Fichiers | Module |
+| Tab | What it does | Files | Module |
 |---|---|---|---|
-| 📐 **Redimensionner** | Change la résolution des dashboards (taille commune ou par dashboard) et repositionne automatiquement les objets. | `.twb`, `.twbx` | `resize_engine.py` |
-| 🔽 **Formater les filtres** | Change le mode d'affichage des filtres, ajoute des filtres à un dashboard à partir d'une feuille source, ou réassocie des filtres existants à une autre feuille (styles synchronisés). | `.twb`, `.twbx` | `filters_engine.py` |
-| 🔌 **Changer la connexion** | Pour les connexions Databricks : change le serveur / chemin HTTP (presets d'environnement ou hôte personnalisé), remplace le catalogue, renomme les tables (y compris dans le SQL personnalisé). | `.twb`, `.twbx`, `.tds` | `connection_engine.py` |
-| 📊 **Performances** | Analyse un enregistrement de performances Tableau (`perf_gantt.tab`) : KPIs, événements les plus lents, résumé par feuille et par catégorie, requêtes sans cache, vagues d'exécution. Analyse optionnelle par Gemini. | `.twbx` d'enregistrement | `performance_engine.py` |
-| 🕸️ **Lignage** | Détecte les champs inutilisés et trace le lignage de la source jusqu'aux usages (voir ci-dessous). | `.twb`, `.twbx` | `lineage_engine.py` |
+| 📐 **Resize** | Changes dashboard resolution (one common size or per dashboard) and automatically repositions objects. | `.twb`, `.twbx` | `resize_engine.py` |
+| 🔽 **Format Filters** | Changes filter display modes, adds filters to a dashboard from a source sheet, or reassigns existing filters to another source sheet (styles are kept in sync). | `.twb`, `.twbx` | `filters_engine.py` |
+| 🔌 **Change Connection** | For Databricks connections: changes the server / HTTP path (environment presets or custom host), replaces the catalog, renames tables (including in custom SQL). | `.twb`, `.twbx`, `.tds` | `connection_engine.py` |
+| 📊 **Performance** | Analyzes a Tableau performance recording (`perf_gantt.tab`): KPIs, slowest events, summaries per sheet and per category, uncached queries, execution waves. Optional Gemini analysis. | recording `.twbx` | `performance_engine.py` |
+| 🕸️ **Lineage** | Finds unused fields and traces lineage from source to usage (see below). | `.twb`, `.twbx` | `lineage_engine.py` |
 
-Les outils de modification produisent un fichier du **même format** que celui d'entrée (un `.twbx` est remballé avec ses ressources). Seul le XML est modifié : le contenu des extraits `.hyper` n'est jamais lu.
+The editing tools output a file in the **same format** as the input (a `.twbx` is repacked with its resources). Only the XML is modified: the content of `.hyper` extracts is never read.
 
-### 🕸️ Lignage
+### 🕸️ Lineage
 
-- **Champs inutilisés** : un champ est considéré comme utilisé s'il sert dans une feuille, un dashboard, une action, une jointure, la visibilité dynamique d'une zone, ou (par propagation) dans un calcul, un groupe ou la valeur par défaut d'un paramètre eux-mêmes utilisés. Statuts : *inutilisé*, *en cascade* (utilisé seulement par des champs inutilisés), *cosmétique* (seulement rangé dans un dossier ou une hiérarchie), *intermédiaire* (utilisé uniquement dans d'autres calculs, candidat au masquage). Tableau filtrable et export Excel.
-- **Graphe de lignage interactif** : sources → calculs → usages (feuilles, actions, zones, jointures) → dashboards. Clic pour voir l'amont et l'aval d'un champ, double-clic (ou bouton) pour isoler son lignage, recherche, remontée depuis un dashboard, bascule libellé / nom interne, filtre par type de nœud, mode *Colonnes* ou *Libre* (nœuds déplaçables), plein écran. Exportable en **page HTML autonome** (aucune dépendance externe).
+- **Unused fields**: a field counts as used if it appears in a sheet, dashboard, action, join, dynamic zone visibility, or (by propagation) in a calculation, group or parameter default value that is itself used. Statuses: *unused*, *cascade* (only used by unused fields), *cosmetic* (only placed in a folder or hierarchy), *intermediate* (only used inside other calculations, a candidate for hiding). Filterable table with Excel export.
+- **Interactive lineage graph**: sources → calculations → usages (sheets, actions, zones, joins) → dashboards. Click a field to see its upstream and downstream, double-click (or use the button) to isolate its lineage, plus search, trace back from a dashboard, caption / internal name toggle, node-type filter, *Columns* or *Free* layout (draggable nodes) and fullscreen. Exportable as a **standalone HTML page** (no external dependencies).
 
-## Lancer en local
+## Run locally
 
 ```bash
 pip install -r requirements.txt
 streamlit run tableau_toolkit.py
 ```
 
-Python 3.10+ recommandé.
+Python 3.10+ recommended.
 
-### Analyse Gemini (optionnelle)
+### Gemini analysis (optional)
 
-L'onglet Performances peut envoyer un résumé à l'API Gemini. Ajouter dans `.streamlit/secrets.toml` (ou dans les *Secrets* de Streamlit Cloud) :
+The Performance tab can send a summary to the Gemini API. Add to `.streamlit/secrets.toml` (or to the Streamlit Cloud *Secrets*):
 
 ```toml
 GEMINI_API_KEY = "..."
-GEMINI_MODEL   = "gemini-2.5-flash"   # optionnel
+GEMINI_MODEL   = "gemini-2.5-flash"   # optional
 ```
 
-Sans clé, le reste de l'application fonctionne normalement.
+Without a key, the rest of the app works normally.
 
-## Structure du dépôt
+## Repository structure
 
 ```
-tableau_toolkit.py      # UI Streamlit (onglets, état de session, téléchargements)
-translations.py         # Textes FR / EN
-utils.py                # Lecture .twb/.twbx, parsing/sérialisation XML, remballage .twbx
-resize_engine.py        # Redimensionnement des dashboards
-filters_engine.py       # Formatage, ajout et réassociation de filtres
-connection_engine.py    # Catalogue, serveur et tables Databricks
-performance_engine.py   # Analyse de perf_gantt.tab + prompt Gemini
-lineage_engine.py       # Analyse des usages, graphe de lignage, exports HTML / Excel
-lineage_template.html   # Page HTML autonome du graphe (placeholders __DATA__, __I18N__…)
+tableau_toolkit.py      # Streamlit UI (tabs, session state, downloads)
+translations.py         # FR / EN strings
+utils.py                # .twb/.twbx loading, XML parsing/serialization, .twbx repacking
+resize_engine.py        # Dashboard resizing
+filters_engine.py       # Filter formatting, adding and reassignment
+connection_engine.py    # Databricks catalog, server and tables
+performance_engine.py   # perf_gantt.tab analysis + Gemini prompt
+lineage_engine.py       # Usage analysis, lineage graph, HTML / Excel exports
+lineage_template.html   # Standalone graph page (placeholders __DATA__, __I18N__…)
 requirements.txt
 ```
 
-Chaque `*_engine.py` ne dépend pas de Streamlit : les fonctions prennent le contenu XML (`bytes`) et renvoient des structures Python ou un XML modifié, ce qui les rend testables et réutilisables en script.
+Each `*_engine.py` is independent of Streamlit: functions take the XML content (`bytes`) and return Python structures or modified XML, which makes them testable and reusable in scripts.
 
-## Notes de conception
+## Design notes
 
-- **XML via `xml.etree.ElementTree`** (pas de lxml). `utils.py` enregistre le préfixe `user:` pour que Tableau reconnaisse les attributs après re-sérialisation.
-- **Confidentialité** : les fichiers uploadés transitent par le serveur qui héberge l'application (Streamlit Cloud en ligne). Pour un classeur dont l'extrait contient des données sensibles, uploader le `.twb` plutôt que le `.twbx`, ou lancer l'application en local.
-- Les presets d'environnement de l'onglet Connexion (serveurs et chemins HTTP Databricks) sont définis dans `tableau_toolkit.py` ; à adapter à votre organisation.
-- Ajouter un outil : créer un `*_engine.py`, ajouter les clés dans `translations.py` (FR et EN), puis un onglet dans `main()` et ses clés d'état à la liste de réinitialisation du changement de fichier.
+- **XML through `xml.etree.ElementTree`** (no lxml). `utils.py` registers the `user:` prefix so Tableau still recognizes its attributes after re-serialization.
+- **Privacy**: uploaded files transit through the server hosting the app (Streamlit Cloud when deployed). For a workbook whose extract contains sensitive data, upload the `.twb` instead of the `.twbx`, or run the app locally.
+- The environment presets of the Connection tab (Databricks servers and HTTP paths) are defined in `tableau_toolkit.py`; adapt them to your organization.
+- Adding a tool: create an `*_engine.py`, add the keys to `translations.py` (FR and EN), then add a tab in `main()` and its session-state keys to the reset list used when the uploaded file changes.
 
 ---
 Tableau Toolkit · dev version · © Idir Saidani & AI
