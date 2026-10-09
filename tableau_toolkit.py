@@ -21,6 +21,11 @@ from performance_engine import (
     requetes_sans_cache, detecter_vagues,
     construire_prompt_llm, analyser_avec_gemini,
 )
+from lineage_engine import (
+    analyser_classeur, champs_inutilises, construire_graphe,
+    generer_html_lignage, exporter_excel,
+)
+import streamlit.components.v1 as components
 from translations import TRANSLATIONS
 
 
@@ -53,8 +58,8 @@ def main():
     _is_tds = xml_file is not None and xml_file.name.endswith(".tds")
 
     st.divider()
-    tab_resize, tab_filtres, tab_connexion, tab_perf = st.tabs(
-        [T["tab_resize"], T["tab_filters"], T["tab_connexion"], T["tab_perf"]]
+    tab_resize, tab_filtres, tab_connexion, tab_perf, tab_lineage = st.tabs(
+        [T["tab_resize"], T["tab_filters"], T["tab_connexion"], T["tab_perf"], T["tab_lineage"]]
     )
 
 
@@ -183,6 +188,9 @@ def main():
         with tab_connexion:
             with st.expander(T["guide_title"], expanded=True):
                 st.markdown(T["conn_guide"])
+        with tab_lineage:
+            with st.expander(T["guide_title"], expanded=True):
+                st.markdown(T["lin_guide"])
         return
 
     try:
@@ -196,7 +204,8 @@ def main():
     if st.session_state.get("fichier_actuel") != xml_file.name:
         for key in ["df_resize", "df_filtres", "filtres_source", "feuilles_par_dashboard",
                     "catalogues", "tables_sql", "df_tables",
-                    "df_reassociation", "toutes_feuilles"]:
+                    "df_reassociation", "toutes_feuilles",
+                    "lin_analyse", "lin_graphe"]:
             st.session_state.pop(key, None)
         st.session_state["fichier_actuel"] = xml_file.name
         st.session_state["format_entree"] = format_entree
@@ -974,6 +983,78 @@ def main():
                         mime=mime,
                         key="dl_connexion",
                     )
+
+
+    # ════════════════════════════════════════════════════
+    # ONGLET 5 — LIGNAGE
+    # ════════════════════════════════════════════════════
+    with tab_lineage:
+        st.subheader(T["lin_title"])
+        st.caption(T["lin_caption"])
+        with st.expander(T["guide_title"]):
+            st.markdown(T["lin_guide"])
+        if _is_tds:
+            st.info(T["tds_not_applicable"])
+        else:
+            try:
+                if "lin_analyse" not in st.session_state:
+                    with st.spinner("…"):
+                        _an = analyser_classeur(xml_content)
+                        st.session_state["lin_analyse"] = _an
+                        st.session_state["lin_graphe"] = construire_graphe(_an)
+            except Exception as e:
+                st.error(T["lin_error"].format(e))
+            if "lin_analyse" in st.session_state:
+                an = st.session_state["lin_analyse"]
+                graphe = st.session_state["lin_graphe"]
+                nb = pd.Series(an["statuts"]).value_counts().to_dict()
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric(T["lin_metric_used"], nb.get("used", 0) + nb.get("intermediate", 0))
+                m2.metric(T["lin_metric_inter"], nb.get("intermediate", 0))
+                m3.metric(T["lin_metric_unused"], nb.get("unused", 0))
+                m4.metric(T["lin_metric_cascade"], nb.get("cascade", 0) + nb.get("cosmetic", 0))
+
+                st.markdown(f"#### {T['lin_unused_title']}")
+                lignes = champs_inutilises(an)
+                if not lignes:
+                    st.success(T["lin_none"])
+                else:
+                    f1, f2 = st.columns(2)
+                    types = sorted({r["type"] for r in lignes})
+                    stats = sorted({r["statut"] for r in lignes})
+                    sel_t = f1.multiselect(T["lin_filter_type"], types, default=types,
+                                           format_func=lambda x: T[f"lin_type_{x}"], key="lin_ft")
+                    sel_s = f2.multiselect(T["lin_filter_status"], stats, default=stats,
+                                           format_func=lambda x: T[f"lin_status_{x}"], key="lin_fs")
+                    vues = [r for r in lignes if r["type"] in sel_t and r["statut"] in sel_s]
+                    colonnes = {
+                        "type": T["lin_col_type"], "statut": T["lin_col_status"], "nom": T["lin_col_name"],
+                        "interne": T["lin_col_internal"], "datatype": T["lin_col_datatype"],
+                        "masque": T["lin_col_hidden"], "table": T["lin_col_table"],
+                        "dossier": T["lin_col_folder"], "note": T["lin_col_note"], "formule": T["lin_col_formula"],
+                    }
+                    affichage = [
+                        {**r, "type": T[f"lin_type_{r['type']}"], "statut": T[f"lin_status_{r['statut']}"]}
+                        for r in vues
+                    ]
+                    st.dataframe(pd.DataFrame(affichage, columns=list(colonnes)).rename(columns=colonnes),
+                                 use_container_width=True, hide_index=True)
+                    st.download_button(
+                        T["lin_dl_xlsx"], data=exporter_excel(affichage, colonnes),
+                        file_name=f"{xml_file.name.rsplit('.', 1)[0]}_unused_fields.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="dl_lin_xlsx",
+                    )
+
+                st.markdown(f"#### {T['lin_graph_title']}")
+                st.caption(T["lin_graph_caption"])
+                html = generer_html_lignage(graphe, lang, xml_file.name)
+                components.html(html, height=900, scrolling=True)
+                st.download_button(
+                    T["lin_dl_html"], data=html.encode("utf-8"),
+                    file_name=f"{xml_file.name.rsplit('.', 1)[0]}_lineage.html",
+                    mime="text/html", key="dl_lin_html",
+                )
 
 
     # ── Footer ────────────────────────────────────────────────────

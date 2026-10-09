@@ -235,6 +235,56 @@ Boîte à outils pour modifier les classeurs Tableau (`.twb` / `.twbx`) et les s
 **Étape 5 — Appliquer et télécharger**
 : Cliquez sur **✅ Appliquer et télécharger** pour récupérer le fichier modifié.
 """,
+        # ── Outil 5 — Lignage ─────────────────────────────────────
+        "tab_lineage":           "🕸️ Lignage",
+        "lin_title":             "Lignage des champs et champs inutilisés",
+        "lin_caption":           "Repère les champs jamais utilisés (feuilles, dashboards, actions, visibilité dynamique, jointures, paramètres) et trace le lignage de la source jusqu'à l'usage.",
+        "lin_guide": """
+**À quoi ça sert ?** Nettoyer un classeur avant de le documenter : savoir quels champs peuvent être supprimés ou masqués, et d'où vient chaque champ.
+
+**Comment faire ?**
+1. Uploadez un classeur `.twb` ou `.twbx` ci-dessus.
+2. Consultez les champs inutilisés, filtrez par type ou statut, puis exportez en Excel.
+3. Ouvrez le graphe de lignage : survolez un champ pour voir ses sources et ses usages, cliquez pour le figer.
+
+**Statuts :**
+- *Inutilisé* : aucune feuille, action, jointure, zone ni calcul vivant ne l'utilise.
+- *En cascade* : utilisé seulement par des champs eux-mêmes inutilisés.
+- *Cosmétique* : seulement rangé dans un dossier ou une hiérarchie.
+- *Intermédiaire* : utilisé uniquement dans d'autres calculs (candidat au masquage).
+""",
+        "lin_metric_used":       "Champs utilisés",
+        "lin_metric_inter":      "Intermédiaires",
+        "lin_metric_unused":     "Inutilisés",
+        "lin_metric_cascade":    "En cascade / cosmétiques",
+        "lin_unused_title":      "Champs inutilisés",
+        "lin_none":              "✅ Aucun champ inutilisé détecté.",
+        "lin_filter_type":       "Type",
+        "lin_filter_status":     "Statut",
+        "lin_col_type":          "Type",
+        "lin_col_status":        "Statut",
+        "lin_col_name":          "Nom affiché",
+        "lin_col_internal":      "Nom interne",
+        "lin_col_datatype":      "Type de données",
+        "lin_col_hidden":        "Masqué",
+        "lin_col_table":         "Table",
+        "lin_col_folder":        "Dossier",
+        "lin_col_note":          "Note",
+        "lin_col_formula":       "Formule",
+        "lin_type_param":        "Paramètre",
+        "lin_type_calc":         "Calcul",
+        "lin_type_group":        "Groupe",
+        "lin_type_source":       "Champ de la source",
+        "lin_type_orphan":       "Orphelin",
+        "lin_status_unused":     "Inutilisé",
+        "lin_status_cascade":    "En cascade",
+        "lin_status_cosmetic":   "Cosmétique",
+        "lin_dl_xlsx":           "📥 Télécharger la liste (Excel)",
+        "lin_graph_title":       "Graphe de lignage",
+        "lin_graph_caption":     "De la source (gauche) aux feuilles, actions, zones et dashboards (droite).",
+        "lin_dl_html":           "📥 Télécharger le graphe (HTML autonome)",
+        "lin_error":             "❌ Analyse impossible : {}",
+        "lin_sheet_unused":      "Champs inutilisés",
         # ── Outil 4 — Performances ────────────────────────────────
         "tab_perf":              "📊 Performances",
         "upload_required":       "⬆️ Uploadez un fichier .twb, .twbx ou .tds pour utiliser cet outil.",
@@ -501,6 +551,56 @@ Toolkit to modify Tableau workbooks (`.twb` / `.twbx`) and data sources (`.tds`)
 **Step 5 — Apply and download**
 : Click **✅ Apply and download** to retrieve the modified file.
 """,
+        # ── Tool 5 — Lineage ──────────────────────────────────────
+        "tab_lineage":           "🕸️ Lineage",
+        "lin_title":             "Field lineage and unused fields",
+        "lin_caption":           "Finds fields that are never used (sheets, dashboards, actions, dynamic visibility, joins, parameters) and traces lineage from source to usage.",
+        "lin_guide": """
+**What is it for?** Cleaning a workbook before documenting it: know which fields can be deleted or hidden, and where each field comes from.
+
+**How to use it:**
+1. Upload a `.twb` or `.twbx` workbook above.
+2. Review the unused fields, filter by type or status, then export to Excel.
+3. Open the lineage graph: hover a field to see its sources and usages, click to pin it.
+
+**Statuses:**
+- *Unused*: no sheet, action, join, zone or live calculation uses it.
+- *Cascade*: only used by fields that are themselves unused.
+- *Cosmetic*: only placed in a folder or hierarchy.
+- *Intermediate*: only used inside other calculations (candidate to hide).
+""",
+        "lin_metric_used":       "Used fields",
+        "lin_metric_inter":      "Intermediate",
+        "lin_metric_unused":     "Unused",
+        "lin_metric_cascade":    "Cascade / cosmetic",
+        "lin_unused_title":      "Unused fields",
+        "lin_none":              "✅ No unused field detected.",
+        "lin_filter_type":       "Type",
+        "lin_filter_status":     "Status",
+        "lin_col_type":          "Type",
+        "lin_col_status":        "Status",
+        "lin_col_name":          "Display name",
+        "lin_col_internal":      "Internal name",
+        "lin_col_datatype":      "Data type",
+        "lin_col_hidden":        "Hidden",
+        "lin_col_table":         "Table",
+        "lin_col_folder":        "Folder",
+        "lin_col_note":          "Note",
+        "lin_col_formula":       "Formula",
+        "lin_type_param":        "Parameter",
+        "lin_type_calc":         "Calculation",
+        "lin_type_group":        "Group",
+        "lin_type_source":       "Source field",
+        "lin_type_orphan":       "Orphan",
+        "lin_status_unused":     "Unused",
+        "lin_status_cascade":    "Cascade",
+        "lin_status_cosmetic":   "Cosmetic",
+        "lin_dl_xlsx":           "📥 Download the list (Excel)",
+        "lin_graph_title":       "Lineage graph",
+        "lin_graph_caption":     "From the source (left) to sheets, actions, zones and dashboards (right).",
+        "lin_dl_html":           "📥 Download the graph (standalone HTML)",
+        "lin_error":             "❌ Analysis failed: {}",
+        "lin_sheet_unused":      "Unused fields",
         # ── Tool 4 — Performance ──────────────────────────────────
         "tab_perf":              "📊 Performance",
         "upload_required":       "⬆️ Upload a .twb, .twbx or .tds file to use this tool.",
