@@ -14,6 +14,7 @@ Boîte à outils pour modifier les classeurs Tableau (`.twb` / `.twbx`) et les s
 - 🔽 **Formater les filtres** — Modifiez le mode des filtres, ajoutez-en ou réassociez leurs feuilles sources.
 - 🔌 **Changer la connexion** — Remplacez le catalogue, le serveur ou renommez les tables dans les connexions Databricks.
 - 📊 **Performances** — Analysez un enregistrement de performances Tableau et identifiez les goulots d'étranglement.
+- 🕸️ **Lignage** — Repérez les champs inutilisés et visualisez le lignage des champs, de la source jusqu'aux usages.
 """,
         # ── Onglets ────────────────────────────────────────────────
         "tab_resize":    "📐 Redimensionner",
@@ -331,6 +332,7 @@ Toolkit to modify Tableau workbooks (`.twb` / `.twbx`) and data sources (`.tds`)
 - 🔽 **Format Filters** — Change filter display modes, add filters, or reassign their source sheets.
 - 🔌 **Change Connection** — Replace the catalog, server, or rename tables in Databricks connections.
 - 📊 **Performance** — Analyze a Tableau performance recording and identify bottlenecks.
+- 🕸️ **Lineage** — Find unused fields and visualize field lineage, from source to usage.
 """,
         # ── Tabs ───────────────────────────────────────────────────
         "tab_resize":    "📐 Resize",
